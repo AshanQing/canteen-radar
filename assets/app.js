@@ -32,7 +32,23 @@
   })();
   function save() { try { localStorage.setItem(ME_KEY, JSON.stringify(ME)); } catch (e) {} }
 
-  var S = { filters: {}, order: 0, rank: "flower", q: "" };
+  var S = { filters: {}, order: 0, rank: "flower", q: "", comboOrder: 0 };
+  var THEME_KEY = "fdr_theme";
+  function curTheme() { return document.documentElement.getAttribute("data-theme") || "light"; }
+  function applyTheme(t) {
+    document.documentElement.setAttribute("data-theme", t);
+    try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
+    Array.prototype.forEach.call(document.querySelectorAll(".themebtn"), function (b) {
+      b.textContent = t === "dark" ? "☀️" : "🌙";
+      b.setAttribute("aria-label", t === "dark" ? "切换到日间模式" : "切换到夜间模式");
+    });
+  }
+  (function initTheme() {
+    var t = null;
+    try { t = localStorage.getItem(THEME_KEY); } catch (e) {}
+    if (!t) t = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", t);
+  })();
 
   function esc(s) {
     return String(s).replace(/[&<>"]/g, function (c) {
@@ -146,6 +162,32 @@
     });
   }
 
+  function combos() {
+    var list = (D.combos || []).map(function (c) {
+      var ds = c.dishIds.map(function (id) { return dById[id]; }).filter(Boolean);
+      var price = ds.reduce(function (a, d) { return a + d.price; }, 0);
+      var kcal = ds.reduce(function (a, d) { return a + d.kcal; }, 0);
+      var avg = ds.reduce(function (a, d) { return a + d.avg; }, 0) / (ds.length || 1);
+      var meat = ds.filter(function (d) { return d.tags.indexOf("肉食") >= 0 || d.tags.indexOf("炸物") >= 0 || d.tags.indexOf("烧烤") >= 0; }).length;
+      var veg = ds.filter(function (d) { return ["素", "清淡", "轻食", "蒸菜", "甜品"].some(function (t) { return d.tags.indexOf(t) >= 0; }); }).length;
+      var staple = ds.filter(function (d) { return /饭|面|包|粥|卷|粉|条|馍/.test(d.name); }).length;
+      var shape = ["主食×" + staple, meat ? "荤×" + meat : "", veg ? "素/清×" + veg : ""].filter(Boolean).join(" + ");
+      return { c: c, ds: ds, price: price, kcal: kcal, avg: avg, shape: shape };
+    });
+    var f = S.filters;
+    if (f.cheap) list.sort(function (a, b) { return a.price - b.price; });
+    else if (f.light) list.sort(function (a, b) {
+      var s = function (k) { return k.ds.filter(function (d) { return d.tags.indexOf("轻食") >= 0 || d.tags.indexOf("清淡") >= 0; }).length; };
+      return s(b) - s(a);
+    });
+    else if (f.protein) list.sort(function (a, b) {
+      var s = function (k) { return k.ds.filter(function (d) { return d.tags.indexOf("高蛋白") >= 0; }).length; };
+      return s(b) - s(a);
+    });
+    var n = S.comboOrder % list.length;
+    return list.slice(n).concat(list.slice(0, n));
+  }
+
   /* ---------------- 视图 ---------------- */
   function period() {
     var h = new Date().getHours();
@@ -195,6 +237,18 @@
     });
     h.push('</div>');
     h.push('<button class="shuffle" data-act="shuffle">🎲 再来一批，我还能纠结</button>');
+
+    // 搭配推荐：主食 + 蛋白 + 蔬菜
+    h.push('<div class="section-title"><span>搭配推荐 · 一个人也要好好吃饭</span><button class="sec-act" data-act="combo-rand">🎲 帮我配一套</button></div>');
+    h.push('<div class="combos">');
+    combos().forEach(function (k) {
+      h.push('<article class="combo" data-act="combo" data-id="' + k.c.id + '"><div class="combo-head"><span class="combo-emoji">' + k.c.emoji + '</span><div><b>' + esc(k.c.name) + '</b><small>' + k.ds.length + ' 道 · ' + k.shape + '</small></div></div><div class="combo-dishes">');
+      k.ds.forEach(function (d) {
+        h.push('<button class="combo-dish" data-act="go" data-href="#/dish/' + d.id + '"><span>' + d.emoji + '</span><span>' + esc(d.name) + '</span><em>' + money(d.price) + '</em></button>');
+      });
+      h.push('</div><p class="combo-tagline">' + esc(k.c.tagline) + '</p><div class="combo-foot"><span class="combo-price">' + money(k.price) + '</span><span>' + k.kcal + ' kcal · 均分 ' + k.avg.toFixed(1) + ' 🌸</span></div></article>');
+    });
+    h.push('</div>');
 
     h.push('<div class="section-title"><span>今日上新 · 试吃官已就位</span><small>新菜先让雷达的同学试毒</small></div>');
     h.push('<div class="hstrip">');
@@ -451,6 +505,15 @@
     var app = document.getElementById("app");
     app.innerHTML = '<main class="screen">' + html + '</main>' + nav(name);
     app.className = "route-" + name;
+    var bar = app.querySelector(".topbar");
+    if (bar) {
+      var tb = document.createElement("button");
+      tb.className = "themebtn";
+      tb.setAttribute("data-act", "theme");
+      tb.textContent = curTheme() === "dark" ? "☀️" : "🌙";
+      tb.setAttribute("aria-label", curTheme() === "dark" ? "切换到日间模式" : "切换到夜间模式");
+      bar.appendChild(tb);
+    }
     window.scrollTo(0, 0);
     var q = document.getElementById("q");
     if (q) {
@@ -541,6 +604,25 @@
       return;
     }
     if (act === "rank") { S.rank = el.getAttribute("data-key"); render(); return; }
+    if (act === "theme") {
+      var next = curTheme() === "dark" ? "light" : "dark";
+      applyTheme(next);
+      toast(next === "dark" ? "🌙 夜间模式：适合躺床上边刷边愧疚" : "☀️ 日间模式：适合在食堂门口纠结");
+      return;
+    }
+    if (act === "combo") {
+      var cid = el.getAttribute("data-id");
+      var k = combos().filter(function (x) { return x.c.id === cid; })[0];
+      if (k) toast("这套 " + money(k.price) + " · " + k.kcal + " kcal，去晚了就没了");
+      return;
+    }
+    if (act === "combo-rand") {
+      S.comboOrder = (S.comboOrder + 1) % (D.combos || []).length;
+      var pick = combos()[0];
+      render(true);
+      toast("🎲 已配好：" + pick.c.name + " · " + money(pick.price) + " · " + pick.kcal + " kcal");
+      return;
+    }
     if (act === "review") { openSheet(dById[el.getAttribute("data-id")]); return; }
     if (act === "close-sheet") { closeSheet(); return; }
     if (act === "fav" || act === "hate") {

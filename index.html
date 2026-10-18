@@ -6,7 +6,19 @@
 <title>食堂雷达 · 胆子肥嘟嘟大学干饭指南</title>
 <meta name="description" content="给胆子肥嘟嘟大学学生用的食堂点评推荐器：今天吃什么、哪道菜值得戴小红花、哪个窗口该绕道。">
 <link rel="stylesheet" href="assets/styles.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍚</text></svg>">
+<script>
+  // 先把主题定下来，避免闪白
+  (function () {
+    try {
+      var t = localStorage.getItem("fdr_theme");
+      if (!t) t = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  })();
+</script>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+<meta name="theme-color" content="#FFC93C">
+<meta name="apple-mobile-web-app-capable" content="yes">
 </head>
 <body>
 <div id="app"></div>

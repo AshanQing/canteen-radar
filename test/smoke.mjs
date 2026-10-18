@@ -65,4 +65,24 @@ console.log("10 食堂详情窗口:", q(".winblock").length);
 window.location.hash = "#/today";
 await new Promise((r) => setTimeout(r, 60));
 console.log("11 首屏推荐理由条数:", q(".why li").length);
+
+// 搭配推荐
+console.log("11a 搭配卡片:", q(".combo").length, "| 组合菜品按钮:", q(".combo-dish").length);
+console.log("11b 搭配价格:", q(".combo-price")[0] && q(".combo-price")[0].textContent);
+const n0 = q(".combo")[0].querySelector("b").textContent;
+click(q('[data-act="combo-rand"]')[0]);
+await new Promise((r) => setTimeout(r, 40));
+const n1 = q(".combo")[0].querySelector("b").textContent;
+console.log("11c 帮我配一套轮换:", n0, "→", n1, "| 变化:", n0 !== n1);
+
+// 主题
+const before = doc.documentElement.getAttribute("data-theme");
+click(q(".themebtn")[0]);
+await new Promise((r) => setTimeout(r, 40));
+const after = doc.documentElement.getAttribute("data-theme");
+console.log("11d 主题切换:", before, "→", after, "| 持久化:", window.localStorage.getItem("fdr_theme"));
+console.log("11e 图标已更新:", q(".themebtn")[0].textContent);
+click(q(".themebtn")[0]);
+await new Promise((r) => setTimeout(r, 40));
+console.log("11f 切回:", doc.documentElement.getAttribute("data-theme"));
 console.log("12 运行错误:", errors.length ? errors.slice(0, 5) : "无");

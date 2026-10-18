@@ -102,5 +102,19 @@
     };
   });
 
-  globalThis.FDR_DATA = { school: "胆子肥嘟嘟大学", canteens: CANTEENS, windows: WINDOWS, dishes: DISHES };
+// 搭配推荐：主食 + 蛋白 + 蔬菜，一个人也要好好吃饭
+  var COMBOS = [
+    ["k1", "干饭人标准套餐", "🐷", ["d1", "d11", "d34"], "荤素都齐，热量超标但值得"],
+    ["k2", "穷鬼快乐套餐", "💸", ["d3", "d49", "d51"], "11 块 5 吃出双主食，月底结算必备"],
+    ["k3", "减脂但不挨饿", "🥗", ["d31", "d32", "d37"], "慢碳水 + 蛋白，饿得比鸡胸沙拉慢"],
+    ["k4", "深夜续命组", "🌙", ["d39", "d48", "d44"], "四食堂限定，吃完有力气赶 ddl"],
+    ["k5", "辣星人豪华版", "🌶️", ["d15", "d45", "d3"], "辣到流泪之后需要一口甜的"],
+    ["k6", "生病了想吃软的", "🤒", ["d6", "d34", "d50"], "宿醉 / 感冒 / 失恋 通用套餐"],
+    ["k7", "早八冲刺包", "🌅", ["d8", "d6", "d51"], "八分钟吃完，踩着铃声进教室"]
+  ].map(function (c) {
+    return { id: c[0], name: c[1], emoji: c[2], dishIds: c[3], tagline: c[4] };
+  });
+
+  globalThis.FDR_DATA = { school: "胆子肥嘟嘟大学", canteens: CANTEENS, windows: WINDOWS, dishes: DISHES, combos: COMBOS };
+
 })();
