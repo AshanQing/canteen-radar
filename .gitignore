@@ -1,2 +1,4 @@
 .tmpdom/
 node_modules/
+preview/
+mk.cjs

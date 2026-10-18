@@ -7,46 +7,44 @@
     </linearGradient>
     <linearGradient id="fur" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#4A3526"/>
-      <stop offset="1" stop-color="#2E2018"/>
+      <stop offset="1" stop-color="#2B1D14"/>
     </linearGradient>
   </defs>
   <circle cx="60" cy="60" r="58" fill="url(#bg)"/>
-  <circle cx="60" cy="60" r="58" fill="none" stroke="#E8A400" stroke-width="2" opacity=".55"/>
+  <circle cx="60" cy="60" r="58" fill="none" stroke="#E8A400" stroke-width="2" opacity=".5"/>
 
-  <!-- ears -->
-  <ellipse cx="39" cy="27" rx="9.5" ry="15" fill="url(#fur)" transform="rotate(-20 39 27)"/>
-  <ellipse cx="81" cy="27" rx="9.5" ry="15" fill="url(#fur)" transform="rotate(20 81 27)"/>
-  <ellipse cx="39" cy="28" rx="4.5" ry="8" fill="#FFB27A" transform="rotate(-20 39 28)"/>
-  <ellipse cx="81" cy="28" rx="4.5" ry="8" fill="#FFB27A" transform="rotate(20 81 28)"/>
+  <!-- kangaroo ears: tall & tilted -->
+  <ellipse cx="36" cy="22" rx="8.6" ry="18" fill="url(#fur)" transform="rotate(-26 36 22)"/>
+  <ellipse cx="84" cy="22" rx="8.6" ry="18" fill="url(#fur)" transform="rotate(26 84 22)"/>
+  <ellipse cx="37" cy="24" rx="3.8" ry="10.5" fill="#FFB27A" transform="rotate(-26 37 24)"/>
+  <ellipse cx="83" cy="24" rx="3.8" ry="10.5" fill="#FFB27A" transform="rotate(26 83 24)"/>
 
   <!-- head -->
-  <circle cx="60" cy="55" r="27" fill="url(#fur)"/>
+  <circle cx="60" cy="55" r="26.5" fill="url(#fur)"/>
   <!-- muzzle -->
-  <ellipse cx="60" cy="65" rx="17.5" ry="13.5" fill="#FFF4E4"/>
+  <ellipse cx="60" cy="66" rx="18" ry="13" fill="#FFF4E4"/>
   <!-- eyes -->
-  <circle cx="49" cy="49" r="5" fill="#FFF4E4"/>
-  <circle cx="71" cy="49" r="5" fill="#FFF4E4"/>
-  <circle cx="50.4" cy="49.8" r="2.3" fill="#1A1208"/>
-  <circle cx="69.6" cy="49.8" r="2.3" fill="#1A1208"/>
-  <!-- bold brows: 胆子肥 -->
-  <rect x="42" y="38.5" width="15" height="4" rx="2" fill="#FFF4E4" transform="rotate(-14 49.5 40.5)"/>
-  <rect x="63" y="38.5" width="15" height="4" rx="2" fill="#FFF4E4" transform="rotate(14 70.5 40.5)"/>
-  <!-- nose & smile -->
-  <ellipse cx="60" cy="60.5" rx="4.2" ry="3" fill="#3B2A1E"/>
-  <path d="M52.5 68.5 Q60 75 67.5 68.5" stroke="#3B2A1E" stroke-width="2.6" fill="none" stroke-linecap="round"/>
-  <!-- chubby cheeks -->
-  <circle cx="34" cy="63" r="4.6" fill="#FF9E6B" opacity=".9"/>
-  <circle cx="86" cy="63" r="4.6" fill="#FF9E6B" opacity=".9"/>
+  <circle cx="49.5" cy="49" r="5.4" fill="#FFF4E4"/>
+  <circle cx="70.5" cy="49" r="5.4" fill="#FFF4E4"/>
+  <circle cx="50.6" cy="50" r="2.5" fill="#1A1208"/>
+  <circle cx="69.4" cy="50" r="2.5" fill="#1A1208"/>
+  <!-- bold brows -->
+  <rect x="43" y="38.6" width="13" height="3.2" rx="1.6" fill="#FFF4E4" transform="rotate(-16 49.5 40.2)"/>
+  <rect x="64" y="38.6" width="13" height="3.2" rx="1.6" fill="#FFF4E4" transform="rotate(16 70.5 40.2)"/>
+  <!-- nose + confident smile -->
+  <ellipse cx="60" cy="61" rx="4.4" ry="3.1" fill="#3B2A1E"/>
+  <path d="M51.5 68.5 Q60 76 68.5 68.5" stroke="#3B2A1E" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <!-- cheeks on the muzzle -->
+  <circle cx="44.5" cy="67" r="4.6" fill="#FF9E6B" opacity=".85"/>
+  <circle cx="75.5" cy="67" r="4.6" fill="#FF9E6B" opacity=".85"/>
 
-  <!-- body / pouch -->
-  <path d="M33 86 Q34 76 60 76 Q86 76 87 86 Q87 107 60 107 Q33 107 33 86 Z" fill="url(#fur)"/>
-  <!-- bowl in pouch -->
-  <ellipse cx="60" cy="89.5" rx="16.5" ry="5" fill="#FFF4E4"/>
-  <path d="M47 90.5 Q60 103 73 90.5 Z" fill="#E8541F"/>
-  <ellipse cx="60" cy="90.5" rx="13" ry="3.4" fill="#FFFFFF"/>
-  <!-- rice -->
-  <path d="M52 89 Q60 82 68 89 Z" fill="#FFFFFF"/>
-  <!-- chopsticks -->
-  <rect x="61" y="78" width="2.2" height="18" rx="1.1" fill="#D9A15B" transform="rotate(18 62 87)"/>
-  <rect x="66" y="78" width="2.2" height="18" rx="1.1" fill="#D9A15B" transform="rotate(24 67 87)"/>
+  <!-- shoulders / pouch body -->
+  <path d="M32 88 Q33 77 60 77 Q87 77 88 88 Q88 108 60 108 Q32 108 32 88 Z" fill="url(#fur)"/>
+  <!-- bowl with rice in the pouch -->
+  <path d="M43 88 Q60 105 77 88 Z" fill="#E8541F"/>
+  <path d="M43 88 Q60 105 77 88 Z" fill="none" stroke="#C43E0E" stroke-width="1.2" opacity=".5"/>
+  <ellipse cx="60" cy="88" rx="17" ry="4.6" fill="#FF7A45"/>
+  <ellipse cx="60" cy="87.6" rx="13.6" ry="3.3" fill="#FFFFFF"/>
+  <path d="M50 87.4 Q60 79 70 87.4 Z" fill="#FFFFFF"/>
+  <path d="M50 87.6 Q60 79.6 70 87.6" stroke="#F2C6A6" stroke-width=".9" fill="none" opacity=".9"/>
 </svg>
