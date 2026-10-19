@@ -35,6 +35,22 @@ window.location.hash = "#/dish/d1";
 await new Promise((r) => setTimeout(r, 60));
 console.log("4 菜品详情:", !!doc.querySelector(".dish-hero"), "| 维度条:", q(".dim").length, "| 评价:", q(".review").length);
 
+// 评价筛选 + 实拍
+const rvAll = q(".review").length;
+console.log("4a 评价筛选按钮:", q(".rvfilter .chip-btn").length, "| 原始评价:", rvAll, "| 配图评价:", q(".rv-pics .rv-pic").length);
+click(q('.rvfilter .chip-btn[data-key="bad"]')[0]);
+await new Promise((r) => setTimeout(r, 40));
+const rvBad = q(".review").length;
+console.log("4b 只看差评:", rvBad, "条 | 标题:", q(".section-title small")[3] && q(".section-title small")[3].textContent);
+console.log("4c 差评筛选有效:", rvBad <= rvAll);
+console.log("4d 同学实拍:", q(".gallery .rv-pic").length, "张 | 评价内配图:", q(".rv-pics .rv-pic").length);
+click(q(".gallery .rv-pic")[0]);
+await new Promise((r) => setTimeout(r, 40));
+console.log("4e 看图浮层:", !!doc.querySelector(".lightbox"));
+click(q(".lb-close")[0]);
+await new Promise((r) => setTimeout(r, 40));
+console.log("4f 浮层关闭:", !doc.querySelector(".lightbox"));
+
 click(q('[data-act="review"]')[0]);
 console.log("5 点评弹层:", !!doc.querySelector(".sheet"), "| 花按钮:", q(".fp").length);
 
@@ -65,6 +81,8 @@ console.log("10 食堂详情窗口:", q(".winblock").length);
 window.location.hash = "#/today";
 await new Promise((r) => setTimeout(r, 60));
 console.log("11 首屏推荐理由条数:", q(".why li").length);
+console.log("11z 文案检查 · 出现「穷鬼」:", /穷鬼/.test(doc.body.textContent), "| 搭配名:", q(".combo b")[0].textContent);
+console.log("11y 横向滚动绑定:", !!q(".combos")[0]._wh, "| 箭头按钮:", q(".sec-arrow").length);
 
 // 搭配推荐
 console.log("11a 搭配卡片:", q(".combo").length, "| 组合菜品按钮:", q(".combo-dish").length);

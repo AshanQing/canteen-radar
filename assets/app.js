@@ -32,7 +32,7 @@
   })();
   function save() { try { localStorage.setItem(ME_KEY, JSON.stringify(ME)); } catch (e) {} }
 
-  var S = { filters: {}, order: 0, rank: "flower", q: "", comboOrder: 0 };
+  var S = { filters: {}, order: 0, rank: "flower", q: "", comboOrder: 0, rvFilter: "all", dishId: "" };
   var THEME_KEY = "fdr_theme";
   function curTheme() { return document.documentElement.getAttribute("data-theme") || "light"; }
   function applyTheme(t) {
@@ -77,7 +77,7 @@
 
   var NAMES = ["隔壁老王", "干饭不眨眼", "三食堂常驻NPC", "减肥失败第9天", "早八战神",
     "夜宵侦察兵", "阿姨的干儿子", "一碗不够", "图书馆难民", "ddl战士",
-    "宿舍长本人", "卡路里不重要", "今天也在排队", "穷但能吃", "大胃王预选赛冠军"];
+    "宿舍长本人", "卡路里不重要", "今天也在排队", "第二碗能免费吗", "大胃王预选赛冠军"];
   var AVATARS = ["🐷", "🐱", "🐼", "🐸", "🐹", "🦊", "🐻", "🐨", "🐧", "🦉"];
 
   function flawOf(d) {
@@ -97,6 +97,14 @@
   var T2 = ["凉了。{f}，避雷。", "{f}，不推荐。", "今天的{n}不是昨天的{n}。"];
   var T1 = ["别点了，{f}，我的钱。", "{f}，直接劝退，冲的兄弟收手。", "吃完 emo 了，不理解好评哪来的。"];
 
+  var PIC_COUNTS = [2, 1, 0, 2, 1, 0, 1];
+
+  function toneOf(d, n) { return (hash(d.id) + n * 37) % 5; }
+  function picTile(d, n, cls) {
+    return '<button class="rv-pic tone-' + toneOf(d, n) + (cls ? " " + cls : "") + '" data-act="pic" data-id="' + d.id + '" data-n="' + n + '" aria-label="查看' + esc(d.name) + '的学生实拍图"><span>' + d.emoji + '</span></button>';
+  }
+  function pictureCount(d) { return 5; }
+
   function reviewsOf(d) {
     var pool = { "1": T1, "2": T2, "3": T3, "4": T4, "5": T5 };
     var out = [], seed = hash(d.id);
@@ -113,6 +121,9 @@
     var avg = d.avg;
     if (avg >= 4.4 && picks.indexOf(5) < 0) picks[0] = 5;
     if (avg <= 3.8 && picks.indexOf(1) < 0 && picks.indexOf(2) < 0) picks[1] = 2;
+    // 有一星就展示一星：差评筛选不能是摆设
+    if (d.dist[0] > 0 && picks.indexOf(1) < 0) picks[picks.length - 1] = 1;
+    if (d.dist[1] > 0 && picks.indexOf(2) < 0) picks[picks.length - 2] = 2;
     picks.forEach(function (star, idx) {
       var tpl = pool[String(star)][(seed + idx * 7) % pool[String(star)].length];
       var text = tpl.replace("{n}", d.name).replace("{p}", money(d.price))
@@ -124,7 +135,8 @@
         avatar: AVATARS[(seed + idx * 5) % AVATARS.length],
         when: days === 1 ? "今天" : (days + " 天前"),
         likes: ((seed + idx * 17) % 40) + 1,
-        tags: star <= 2 ? [flawOf(d).slice(0, 4)] : d.tags.slice(0, 2)
+        tags: star <= 2 ? [flawOf(d).slice(0, 4)] : d.tags.slice(0, 2),
+        pics: PIC_COUNTS[idx % PIC_COUNTS.length]
       });
     });
     return out;
@@ -214,7 +226,7 @@
     h.push('<section class="hero"><div class="hero-icon">' + p.icon + '</div><div><h1>' + p.t + '，今天吃这个</h1><p>' + p.s + '</p></div></section>');
 
     var chips = [["cheap", "💸 10 块内"], ["nowait", "🏃 不排队"], ["spicy", "🌶️ 想吃辣"], ["light", "🥬 清淡点"], ["protein", "💪 高蛋白"], ["fresh", "🆕 没吃过"]];
-    h.push('<div class="chips">');
+    h.push('<div class="chips hscroll">');
     chips.forEach(function (c) {
       h.push('<button class="chip-btn' + (S.filters[c[0]] ? " on" : "") + '" data-act="filter" data-key="' + c[0] + '">' + c[1] + '</button>');
     });
@@ -239,8 +251,8 @@
     h.push('<button class="shuffle" data-act="shuffle">🎲 再来一批，我还能纠结</button>');
 
     // 搭配推荐：主食 + 蛋白 + 蔬菜
-    h.push('<div class="section-title"><span>搭配推荐 · 一个人也要好好吃饭</span><button class="sec-act" data-act="combo-rand">🎲 帮我配一套</button></div>');
-    h.push('<div class="combos">');
+    h.push('<div class="section-title"><span>搭配推荐 · 一个人也要好好吃饭</span><span class="sec-actions"><button class="sec-arrow" data-act="scroll" data-target=".combos" data-dir="-1" aria-label="上一组搭配">‹</button><button class="sec-arrow" data-act="scroll" data-target=".combos" data-dir="1" aria-label="下一组搭配">›</button><button class="sec-act" data-act="combo-rand">🎲 配一套</button></span></div>');
+    h.push('<div class="combos hscroll">');
     combos().forEach(function (k) {
       h.push('<article class="combo" data-act="combo" data-id="' + k.c.id + '"><div class="combo-head"><span class="combo-emoji">' + k.c.emoji + '</span><div><b>' + esc(k.c.name) + '</b><small>' + k.ds.length + ' 道 · ' + k.shape + '</small></div></div><div class="combo-dishes">');
       k.ds.forEach(function (d) {
@@ -251,7 +263,7 @@
     h.push('</div>');
 
     h.push('<div class="section-title"><span>今日上新 · 试吃官已就位</span><small>新菜先让雷达的同学试毒</small></div>');
-    h.push('<div class="hstrip">');
+    h.push('<div class="hstrip hscroll">');
     newOnes.forEach(function (d) {
       h.push('<a class="mini" href="#/dish/' + d.id + '"><div class="mini-emoji">' + d.emoji + '</div><b>' + esc(d.name) + '</b><span>' + money(d.price) + ' · 🌸' + d.avg.toFixed(1) + '</span><span class="mini-note">' + d.votes + ' 人试过</span></a>');
     });
@@ -302,7 +314,7 @@
     var tabs = [["flower", "🌸 小红花榜"], ["value", "💸 性价比"], ["new", "🆕 新菜"], ["ray", "⚡ 雷区"], ["window", "🏪 窗口"]];
     var h = [];
     h.push('<header class="topbar"><div class="brand"><span class="brand-mark">🏆</span><div><b>榜单</b><small>全部由小红花投票算的，不接受公关</small></div></div></header>');
-    h.push('<div class="chips scroll">');
+    h.push('<div class="chips scroll hscroll">');
     tabs.forEach(function (t) {
       h.push('<button class="chip-btn' + (S.rank === t[0] ? " on" : "") + '" data-act="rank" data-key="' + t[0] + '">' + t[1] + '</button>');
     });
@@ -420,11 +432,48 @@
       h.push('<div class="mine-note">你给过 ' + mine.flowers + ' 朵：' + esc(mine.text || "（没写字，但花是真心的）") + '</div>');
     }
 
-    h.push('<div class="section-title"><span>同学们怎么说</span><small>按时间倒序</small></div><div class="reviews">');
+    var rf = S.rvFilter || "all";
+    var cnt = { good: 0, mid: 0, bad: 0, pic: 0 };
     rs.forEach(function (r) {
-      h.push('<div class="review"><div class="rv-head"><span class="rv-ava">' + r.avatar + '</span><b>' + r.who + '</b><span class="rv-flower">' + flowers(r.star) + '</span></div>' +
-        '<p class="rv-text">' + esc(r.text) + '</p><div class="rv-foot">' + r.tags.map(function (t) { return '<span class="tag sm">' + t + '</span>'; }).join('') + '<span class="rv-when">' + r.when + ' · 有用 ' + r.likes + '</span></div></div>');
+      if (r.star >= 4) cnt.good++;
+      if (r.star === 3) cnt.mid++;
+      if (r.star <= 2) cnt.bad++;
+      if (r.pics > 0) cnt.pic++;
     });
+    var shown = rs.filter(function (r) {
+      if (rf === "good") return r.star >= 4;
+      if (rf === "mid") return r.star === 3;
+      if (rf === "bad") return r.star <= 2;
+      if (rf === "pic") return r.pics > 0;
+      return true;
+    });
+    h.push('<div class="section-title"><span>同学们怎么说</span><small>' + (rf === "all" ? "按时间倒序 · " + rs.length + " 条" : "筛选后 " + shown.length + " 条") + '</small></div>');
+    h.push('<div class="rvfilter">');
+    [["all", "全部 " + rs.length], ["good", "👍 好评 " + cnt.good], ["mid", "😐 中评 " + cnt.mid], ["bad", "👎 只看差评 " + cnt.bad], ["pic", "📷 有图 " + cnt.pic]].forEach(function (t) {
+      h.push('<button class="chip-btn sm' + (rf === t[0] ? " on" : "") + '" data-act="rvfilter" data-key="' + t[0] + '">' + t[1] + '</button>');
+    });
+    h.push('</div><div class="reviews">');
+    if (!shown.length) {
+      h.push('<p class="hint">' + (rf === "bad"
+        ? "这道菜目前 0 条差评，雷率只有 " + pct(d.ray) + "，属于真的稳。想找坑可以去「榜单 → 雷区」。"
+        : rf === "pic" ? "还没有人带图，欢迎你去拍一张（虽然是演示，但你也可以假装拍了）。"
+        : "这个筛选下还没有人发言，换个条件看看。") + '</p>');
+    }
+    shown.forEach(function (r, idx) {
+      var pics = "";
+      if (r.pics > 0) {
+        pics = '<div class="rv-pics">';
+        for (var j = 0; j < r.pics; j++) pics += picTile(d, idx * 3 + j, "sm");
+        pics += '</div>';
+      }
+      h.push('<div class="review"><div class="rv-head"><span class="rv-ava">' + r.avatar + '</span><b>' + r.who + '</b><span class="rv-flower">' + flowers(r.star) + '</span></div>' +
+        '<p class="rv-text">' + esc(r.text) + '</p>' + pics +
+        '<div class="rv-foot">' + r.tags.map(function (t) { return '<span class="tag sm">' + t + '</span>'; }).join('') + '<span class="rv-when">' + r.when + ' · 有用 ' + r.likes + '</span></div></div>');
+    });
+    h.push('</div>');
+
+    h.push('<div class="section-title"><span>同学实拍</span><small>' + pictureCount(d) + ' 张 · 点开看大图（演示示意）</small></div><div class="gallery">');
+    for (var pi = 0; pi < pictureCount(d); pi++) h.push(picTile(d, pi));
     h.push('</div>');
 
     var sim = DISHES.filter(function (x) { return x.id !== d.id && x.tags.some(function (t) { return d.tags.indexOf(t) >= 0; }); })
@@ -498,6 +547,7 @@
     if (hashv.charAt(0) === "/") hashv = hashv.slice(1);
     var parts = hashv.split("/");
     var name = parts[0] || "today";
+    if (name === "dish" && S.dishId !== parts[1]) { S.dishId = parts[1]; S.rvFilter = "all"; }
     var html;
     if (name === "dish") html = viewDish(parts[1]);
     else if (name === "canteen") html = viewCanteen(parts[1]);
@@ -514,6 +564,7 @@
       tb.setAttribute("aria-label", curTheme() === "dark" ? "切换到日间模式" : "切换到夜间模式");
       bar.appendChild(tb);
     }
+    bindWheel();
     window.scrollTo(0, 0);
     var q = document.getElementById("q");
     if (q) {
@@ -529,6 +580,29 @@
     });
     h.push('</nav>');
     return h.join('');
+  }
+
+  // 横向容器：支持鼠标滚轮直接滑（不用按 Shift）
+  function bindWheel() {
+    Array.prototype.forEach.call(document.querySelectorAll(".hscroll, .chips, .combos"), function (el) {
+      if (el._wh) return;
+      el._wh = true;
+      el.addEventListener("wheel", function (e) {
+        if (el.scrollWidth <= el.clientWidth + 4) return;
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+          el.scrollLeft += e.deltaY;
+          e.preventDefault();
+        }
+      }, { passive: false });
+    });
+  }
+
+  function openPic(d, n) {
+    document.getElementById("sheet-root").innerHTML =
+      '<div class="sheet-mask" data-act="close-pic"></div><div class="lightbox"><button class="lb-close" data-act="close-pic" aria-label="关闭">✕</button>' +
+      '<div class="lb-tile tone-' + toneOf(d, n) + '"><span>' + d.emoji + '</span></div>' +
+      '<div class="lb-cap"><b>' + esc(d.name) + '</b><small>' + d.canteen.name + ' · ' + d.win.name + ' · 学生实拍（演示示意）</small></div></div>';
+    document.body.classList.add("lock");
   }
 
   var lastQFocus = false;
@@ -608,6 +682,18 @@
       var next = curTheme() === "dark" ? "light" : "dark";
       applyTheme(next);
       toast(next === "dark" ? "🌙 夜间模式：适合躺床上边刷边愧疚" : "☀️ 日间模式：适合在食堂门口纠结");
+      return;
+    }
+    if (act === "scroll") {
+      var tgt = document.querySelector(el.getAttribute("data-target"));
+      if (tgt) tgt.scrollBy({ left: (+el.getAttribute("data-dir")) * 300, behavior: "smooth" });
+      return;
+    }
+    if (act === "rvfilter") { S.rvFilter = el.getAttribute("data-key"); render(true); return; }
+    if (act === "pic") { openPic(dById[el.getAttribute("data-id")], +el.getAttribute("data-n")); return; }
+    if (act === "close-pic") {
+      document.getElementById("sheet-root").innerHTML = "";
+      document.body.classList.remove("lock");
       return;
     }
     if (act === "combo") {

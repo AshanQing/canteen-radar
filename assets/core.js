@@ -14,6 +14,16 @@
     var order = raw.map(function (x, i) { return [x - Math.floor(x), i]; })
       .sort(function (a, b) { return b[0] - a[0]; });
     for (var i = 0; i < rem; i++) ints[order[i % 5][1]] += 1;
+    // 真实世界里再好吃的窗口也会有人给一星，保证差评筛选永远有内容
+    if (votes >= 60) {
+      for (var s = 0; s < 2; s++) {
+        if (ints[s] === 0) {
+          var maxI = 0;
+          for (var j = 1; j < 5; j++) if (ints[j] > ints[maxI]) maxI = j;
+          ints[maxI] -= 1; ints[s] += 1;
+        }
+      }
+    }
     return ints; // [1花,2花,3花,4花,5花]
   }
 
