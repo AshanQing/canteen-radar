@@ -27,6 +27,8 @@ console.log("1 首屏渲染:", q("#app .screen").length === 1, "| rec 卡片:", 
 const chip = q('.chip-btn[data-key="cheap"]')[0];
 click(chip);
 console.log("2 筛选生效:", q('.chip-btn[data-key="cheap"]')[0].classList.contains("on"), "| rec:", q(".rec").length);
+const prefs0 = JSON.parse(window.localStorage.getItem("fdr_prefs") || "{}");
+console.log("2b 筛选已写入记忆:", prefs0.filters && prefs0.filters.cheap === true, "| 清空按钮:", q('[data-act="clear-filter"]').length);
 
 click(q('[data-act="shuffle"]')[0]);
 console.log("3 换一批:", q(".rec").length === 3);
@@ -51,16 +53,27 @@ click(q(".lb-close")[0]);
 await new Promise((r) => setTimeout(r, 40));
 console.log("4f 浮层关闭:", !doc.querySelector(".lightbox"));
 
+// 自动配菜
+const acBefore = Array.from(q(".ac-row")).map((e) => e.querySelector("b").textContent).join(" / ");
+console.log("4g 自动配菜行数:", q(".ac-row").length, "|", acBefore);
+click(q('[data-act="recombo"]')[0]);
+await new Promise((r) => setTimeout(r, 60));
+const acAfter = Array.from(q(".ac-row")).map((e) => e.querySelector("b").textContent).join(" / ");
+console.log("4h 换一组配菜:", acAfter, "| 变化:", acAfter !== acBefore);
+
 click(q('[data-act="review"]')[0]);
 console.log("5 点评弹层:", !!doc.querySelector(".sheet"), "| 花按钮:", q(".fp").length);
 
+console.log("5b 上传入口:", !!doc.querySelector("#rv-file"), "| 按钮:", !!doc.querySelector(".up-btn"));
+window._sheet.pics = ["data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"];
 click(q(".fp")[4]);
 click(q('.chip-btn[data-t="真香"]')[0]);
 doc.querySelector("#rv-text").value = "阿姨今天手真的没抖，肉给得比室友的头发还多";
 click(q('[data-act="submit"]')[0]);
 await new Promise((r) => setTimeout(r, 60));
 const saved = JSON.parse(window.localStorage.getItem("fdr_me_v1") || "{}");
-console.log("6 提交持久化:", (saved.reviews || []).length === 1, "| 花数:", saved.reviews && saved.reviews[0] && saved.reviews[0].flowers);
+console.log("6 提交持久化:", (saved.reviews || []).length === 1, "| 花数:", saved.reviews && saved.reviews[0] && saved.reviews[0].flowers, "| 带图:", (saved.reviews[0].pics || []).length);
+console.log("6b 我的点评卡:", !!doc.querySelector(".review.mine"), "| 我的实拍图:", q(".review.mine .rv-pic.real").length, "| 实拍区总数:", q(".gallery .rv-pic").length);
 
 window.location.hash = "#/rank";
 await new Promise((r) => setTimeout(r, 60));

@@ -101,7 +101,83 @@
     return ctx.wilson * Math.log(1 + ctx.votes) * (ctx.decay == null ? 1 : ctx.decay);
   }
 
+
+  /* ---------- 按主菜自动配菜 ---------- */
+  function roleOf(d) {
+    var t = d.tags, n = d.name;
+    var staple = /饭|面|包|粥|卷|粉|条|馍|饺/.test(n) || t.indexOf("面食") >= 0 || t.indexOf("早餐") >= 0;
+    var protein = t.indexOf("肉食") >= 0 || t.indexOf("炸物") >= 0 || t.indexOf("高蛋白") >= 0 ||
+      t.indexOf("烧烤") >= 0 || /鸡|牛|肉|鱼|排骨|蛋|虾|排/.test(n);
+    var veg = t.indexOf("素") >= 0 || t.indexOf("清淡") >= 0 || t.indexOf("轻食") >= 0 || t.indexOf("蒸菜") >= 0;
+    var sweet = t.indexOf("甜品") >= 0 || t.indexOf("小食") >= 0;
+    if (sweet && !protein && !staple) return "sweet";
+    if (protein) return "protein";
+    if (staple) return "staple";
+    if (veg) return "veg";
+    return "other";
+  }
+
+  // 已经是一份盖饭/面的，就不要再配一份主食了
+  function planFor(main) {
+    var r = roleOf(main);
+    var full = /饭|面|河|粉|条|馍|卷|饼/.test(main.name) || roleOf(main) === "staple";
+    if (r === "protein" && full) return ["veg", "sweet"];
+    if (r === "protein") return ["staple", "veg"];
+    if (r === "staple") return ["protein", "veg"];
+    if (r === "veg") return ["staple", "protein"];
+    if (r === "sweet") return ["protein", "veg"];
+    return ["protein", "veg"];
+  }
+
+  function pickSide(main, pool, role, variant, used) {
+    var cands = pool.filter(function (d) {
+      return d.id !== main.id && used.indexOf(d.id) < 0 && roleOf(d) === role;
+    });
+    if (role === "sweet") {
+      var sweetOnly = cands.filter(function (d) { return d.tags.indexOf("甜品") >= 0; });
+      if (sweetOnly.length) cands = sweetOnly;
+    }
+    if (role === "staple") {
+      var solid = cands.filter(function (d) { return !/粥/.test(d.name); });
+      if (solid.length) cands = solid;
+    }
+    if (!cands.length) return null;
+    var scored = cands.map(function (d) {
+      var same = d.canteen && main.canteen && d.canteen.id === main.canteen.id ? 1 : 0;
+      var s = 0.32 * (d.avg / 5) + 0.24 * (1 - d.ray) + 0.14 * Math.max(0, 1 - d.price / 22) +
+        0.18 * same + 0.12 * Math.max(0, 1 - d.wait / 22);
+      return { d: d, s: s };
+    }).sort(function (a, b) { return b.s - a.s; });
+    // 在头部候选里轮换，「换一组」才会真的换
+    var top = Math.min(6, scored.length);
+    return scored[variant % top].d;
+  }
+
+  // 返回 {main, sides, price, kcal, shape, note}
+  function buildCombo(main, pool, variant) {
+    variant = variant || 0;
+    var roles = planFor(main);
+    var used = [main.id], sides = [];
+    roles.forEach(function (r) {
+      var pick = pickSide(main, pool, r, variant, used);
+      if (pick) { sides.push(pick); used.push(pick.id); }
+    });
+    var all = [main].concat(sides);
+    var price = all.reduce(function (a, d) { return a + d.price; }, 0);
+    var kcal = all.reduce(function (a, d) { return a + d.kcal; }, 0);
+    var shape = sides.map(function (d) {
+      var r = roleOf(d);
+      return r === "protein" ? "补蛋白" : r === "staple" ? "补主食" : r === "veg" ? "补青菜" : "补甜口";
+    }).join(" + ");
+    var sameWin = sides.filter(function (d) { return d.canteen.id === main.canteen.id; }).length;
+    var note = sameWin === sides.length && sides.length
+      ? "配菜都在同一个食堂，少走一趟"
+      : sameWin ? "有一道在隔壁食堂，愿意走两步更划算" : "配菜在别的食堂，看你想不想动";
+    return { main: main, sides: sides, price: price, kcal: kcal, shape: shape, note: note };
+  }
+
   globalThis.FDR_CORE = {
+    roleOf: roleOf, buildCombo: buildCombo,
     clamp: clamp, buildDist: buildDist, avgOfDist: avgOfDist, wilson: wilson,
     riskOf: riskOf, scoreDish: scoreDish, reasonsFor: reasonsFor, rankScore: rankScore,
     weightsFor: weightsFor
