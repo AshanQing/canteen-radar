@@ -316,6 +316,7 @@
     var ae = document.activeElement;
     if (ae && /INPUT|TEXTAREA/.test(ae.tagName)) return;
     if (document.body.classList.contains("lock")) return;
+    if (!/^#\/(today|rank|dish)/.test(location.hash || "#/today")) return;
     render(true);
   }
 
