@@ -1,0 +1,9 @@
+name = "fdr-api"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# 先执行：wrangler kv namespace create FDR
+# 然后把返回的 id 填到下面
+[[kv_namespaces]]
+binding = "FDR"
+id = "在这里填 kv namespace 的 id"

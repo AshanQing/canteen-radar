@@ -15,20 +15,39 @@
       wait: d.wait, emoji: d.emoji, isNew: d.isNew, win: win,
       canteen: cById[win.canteenId], dist: dist,
       avg: C.avgOfDist(dist), good: good, goodRate: good / d.votes,
-      wilson: C.wilson(good, d.votes), ray: C.riskOf(dist)
+      wilson: C.wilson(good, d.votes), ray: C.riskOf(dist),
+      baseDist: dist.slice(), baseVotes: d.votes
     };
     return o;
   });
+
+  // 种子数据 + 真实评价 = 页面上看到的分数
+  function recompute() {
+    DISHES.forEach(function (d) {
+      var dist = d.baseDist.slice();
+      window.Store.byDish(d.id).forEach(function (r) {
+        var k = Math.max(0, Math.min(4, r.flowers - 1));
+        dist[k] += (window.FDR_DEMO_WEIGHT || 3);
+      });
+      d.dist = dist;
+      d.votes = dist.reduce(function (a, b) { return a + b; }, 0);
+      d.avg = C.avgOfDist(dist);
+      d.good = dist[3] + dist[4];
+      d.goodRate = d.good / d.votes;
+      d.wilson = C.wilson(d.good, d.votes);
+      d.ray = C.riskOf(dist);
+    });
+  }
   var dById = {};
   DISHES.forEach(function (d) { dById[d.id] = d; });
 
-  var ME_KEY = "fdr_me_v1";
+  var ME_KEY = "fdr_me_v2";
   var ME = (function () {
     try {
       var raw = JSON.parse(localStorage.getItem(ME_KEY));
-      if (raw && raw.reviews) return raw;
+      if (raw) return { favs: raw.favs || [], hates: raw.hates || [] };
     } catch (e) {}
-    return { reviews: [], favs: [], hates: [] };
+    return { favs: [], hates: [] };
   })();
   function save() {
     try { localStorage.setItem(ME_KEY, JSON.stringify(ME)); return true; }
@@ -78,11 +97,8 @@
   }
   function money(n) { return "¥" + (n % 1 === 0 ? n : n.toFixed(1)); }
   function pct(x) { return Math.round(x * 100) + "%"; }
-  function eaten(id) { return ME.reviews.some(function (r) { return r.dishId === id; }); }
-  function myReview(id) {
-    var mine = ME.reviews.filter(function (r) { return r.dishId === id; });
-    return mine.length ? mine[mine.length - 1] : null;
-  }
+  function eaten(id) { return !!window.Store.mine(id); }
+  function myReview(id) { return window.Store.mine(id); }
   function ctxOf(d) {
     return {
       avg: d.avg, wilson: d.wilson, votes: d.votes, ray: d.ray,
@@ -161,6 +177,35 @@
       });
     });
     return out;
+  }
+
+  function relTime(iso) {
+    var t = new Date(iso).getTime();
+    if (!t) return "刚刚";
+    var m = Math.round((Date.now() - t) / 60000);
+    if (m < 1) return "刚刚";
+    if (m < 60) return m + " 分钟前";
+    var h = Math.round(m / 60);
+    if (h < 24) return h + " 小时前";
+    return Math.round(h / 24) + " 天前";
+  }
+
+  // 真实评价（多人共享）排最前面，示例评价在后
+  function liveReviewsOf(d) {
+    return window.Store.byDish(d.id).slice().reverse().map(function (r) {
+      return {
+        live: true,
+        star: r.flowers,
+        text: r.text || "（没写字，只留了花）",
+        who: r.authorName + (r.authorId === window.Store.authorId ? " · 我" : ""),
+        avatar: r.avatar || "🐼",
+        when: relTime(r.createdAt),
+        likes: 0,
+        tags: r.tags || [],
+        pics: (r.pics || []).length,
+        picList: r.pics || []
+      };
+    });
   }
 
   function flowers(n) {
@@ -426,7 +471,8 @@
     var mine = myReview(d.id);
     var fav = ME.favs.indexOf(d.id) >= 0;
     var hated = ME.hates.indexOf(d.id) >= 0;
-    var rs = reviewsOf(d);
+    var rs = liveReviewsOf(d).concat(reviewsOf(d));
+    var galleryPics = window.Store.picsOf(d.id);
     var total = d.dist.reduce(function (a, b) { return a + b; }, 0);
     var h = ['<header class="topbar"><a class="ghost-btn" href="javascript:history.back()">← 返回</a><div class="brand"><div><b>' + esc(d.name) + '</b><small>' + d.canteen.name + ' · ' + d.win.name + '</small></div></div></header>'];
     h.push('<section class="dish-hero"><div class="dish-emoji">' + d.emoji + '</div><div><div class="dish-price">' + money(d.price) + ' <small>/ ' + d.kcal + ' kcal</small></div><p class="dish-desc">' + esc(d.desc) + '</p>' +
@@ -483,17 +529,6 @@
       h.push('<button class="chip-btn sm' + (rf === t[0] ? " on" : "") + '" data-act="rvfilter" data-key="' + t[0] + '">' + t[1] + '</button>');
     });
     h.push('</div><div class="reviews">');
-    if (mine) {
-      var mp = "";
-      if (mine.pics && mine.pics.length) {
-        mp = '<div class="rv-pics">' + mine.pics.map(function (src, i) {
-          return '<button class="rv-pic real" data-act="pic-real" data-i="' + i + '"><img src="' + src + '" alt="我的实拍"></button>';
-        }).join('') + '</div>';
-      }
-      h.push('<div class="review mine"><div class="rv-head"><span class="rv-ava">🐼</span><b>我（刚写的）</b><span class="rv-flower">' + flowers(mine.flowers) + '</span></div>' +
-        '<p class="rv-text">' + esc(mine.text || "（没写字，但花是真心的）") + '</p>' + mp +
-        '<div class="rv-foot">' + (mine.tags || []).map(function (t) { return '<span class="tag sm">' + t + '</span>'; }).join('') + '<span class="rv-when">刚刚 · 权重 ×1.0</span></div></div>');
-    }
     if (!shown.length) {
       h.push('<p class="hint">' + (rf === "bad"
         ? "这道菜目前 0 条差评，雷率只有 " + pct(d.ray) + "，属于真的稳。想找坑可以去「榜单 → 雷区」。"
@@ -502,23 +537,25 @@
     }
     shown.forEach(function (r, idx) {
       var pics = "";
-      if (r.pics > 0) {
+      if (r.live && r.picList && r.picList.length) {
+        pics = '<div class="rv-pics">' + r.picList.map(function (src) {
+          return '<button class="rv-pic real" data-act="pic-real" data-src="' + src + '"><img src="' + src + '" alt="学生实拍"></button>';
+        }).join('') + '</div>';
+      } else if (r.pics > 0) {
         pics = '<div class="rv-pics">';
         for (var j = 0; j < r.pics; j++) pics += picTile(d, idx * 3 + j, "sm");
         pics += '</div>';
       }
-      h.push('<div class="review"><div class="rv-head"><span class="rv-ava">' + r.avatar + '</span><b>' + r.who + '</b><span class="rv-flower">' + flowers(r.star) + '</span></div>' +
+      h.push('<div class="review' + (r.live ? " live" : "") + '"><div class="rv-head"><span class="rv-ava">' + r.avatar + '</span><b>' + r.who + '</b>' + (r.live ? '<span class="live-tag">实时</span>' : '') + '<span class="rv-flower">' + flowers(r.star) + '</span></div>' +
         '<p class="rv-text">' + esc(r.text) + '</p>' + pics +
         '<div class="rv-foot">' + r.tags.map(function (t) { return '<span class="tag sm">' + t + '</span>'; }).join('') + '<span class="rv-when">' + r.when + ' · 有用 ' + r.likes + '</span></div></div>');
     });
     h.push('</div>');
 
     h.push('<div class="section-title"><span>同学实拍</span><small>' + pictureCount(d) + ' 张 · 点开看大图（演示示意）</small></div><div class="gallery">');
-    if (mine && mine.pics && mine.pics.length) {
-      mine.pics.forEach(function (src, i) {
-        h.push('<button class="rv-pic real" data-act="pic-real" data-i="' + i + '"><img src="' + src + '" alt="我的实拍"></button>');
-      });
-    }
+    galleryPics.forEach(function (src) {
+      h.push('<button class="rv-pic real" data-act="pic-real" data-src="' + src + '"><img src="' + src + '" alt="学生实拍"></button>');
+    });
     for (var pi = 0; pi < pictureCount(d); pi++) h.push(picTile(d, pi));
     h.push('</div>');
 
@@ -533,14 +570,21 @@
   }
 
   function viewMe() {
-    var reviews = ME.reviews.slice().reverse();
+    var reviews = window.Store.reviews.filter(function (r) { return r.authorId === window.Store.authorId; }).slice().reverse();
     var sp = reviews.length ? reviews.reduce(function (a, r) { return a + r.flowers; }, 0) / reviews.length : 0;
     var favs = ME.favs.map(function (id) { return dById[id]; }).filter(Boolean);
     var hates = ME.hates.map(function (id) { return dById[id]; }).filter(Boolean);
     var spicy = reviews.length ? "待统计" : "还没开口";
     var h = ['<header class="topbar"><div class="brand"><span class="brand-mark">🐷</span><div><b>我的干饭档案</b><small>数据只存在你这台设备上</small></div></div></header>'];
-    h.push('<div class="me-card"><div class="me-top"><span class="me-ava">🐼</span><div><b>匿名干饭人</b><small>已验证学生 · 胆子肥嘟嘟大学</small></div></div>' +
+    h.push('<div class="me-card"><div class="me-top"><span class="me-ava">🐼</span><div><b>' + esc(window.Store.authorName) + '</b><small>匿名身份 · 胆子肥嘟嘟大学（数据为演示）</small></div><button class="me-edit" data-act="nick">改昵称</button></div>' +
       '<div class="me-stats"><div><b>' + reviews.length + '</b><span>点评</span></div><div><b>' + favs.length + '</b><span>收藏</span></div><div><b>' + hates.length + '</b><span>避雷</span></div><div><b>' + (sp ? sp.toFixed(1) : "-") + '</b><span>平均给花</span></div></div></div>');
+
+    h.push('<div class="synccard">' +
+      '<div class="sync-row"><span>数据模式</span><b>' + (window.Store.mode === "remote" ? "联网共享" : "仅本机") + '</b></div>' +
+      '<div class="sync-row"><span>房间</span><b>' + esc(window.Store.room) + '</b></div>' +
+      '<div class="sync-row"><span>状态</span><b>' + esc(window.Store.status) + '</b></div>' +
+      '<div class="sync-acts"><button class="btn ghost" data-act="export">导出分享码</button><button class="btn ghost" data-act="import">导入同学的评价</button></div>' +
+      '<p class="sync-note">仅本机模式：点评只存在这台设备。连上共享后端后，同一房间的人能互相看到彼此的点评。</p></div>');
 
     h.push('<div class="section-title"><span>我的口味画像</span><small>根据你的小红花算的</small></div>');
     var tags = {};
@@ -581,7 +625,9 @@
       '<div class="prose"><h2>它解决什么</h2><p>胆子肥嘟嘟大学有 4 个食堂、15 个窗口、51 道菜。每天中午最难的不是排队，是「吃什么」。食堂雷达把点评的颗粒度从「店」拆到「菜」，再用你现在的条件（预算、时间、胃口、吃没吃过）算出一份可解释的推荐。</p>',
       '<h2>小红花是怎么来的</h2><p>一餐一票，最多五朵。菜品均分不是简单平均，而是用 Wilson 置信下限做保守估计：只有 3 朵花的菜，就算全是五星，也不会骑在 400 朵花的招牌菜头上。</p>',
       '<h2>为什么单设一个雷区榜</h2><p>好评可以被凑，差评不会。雷区榜只看踩雷比例，专门用来劝退。任何一条差评都不会被好评「抵消」——这也是我们和某些平台的分歧所在。</p>',
-      '<h2>关于数据</h2><p>本作品是求职作品 demo：学校「胆子肥嘟嘟大学」、食堂窗口、菜品、评价全部虚构，仅用于演示产品结构与交互。你的收藏和点评只存在浏览器本地（localStorage），不会上传。</p>',
+      '<h2>关于数据</h2><p>本作品是求职作品 demo：学校「胆子肥嘟嘟大学」、食堂窗口、菜品、评价全部虚构，仅用于演示产品结构与交互。</p>',
+      '<h2>两种运行模式</h2><p><b>仅本机模式</b>（默认）：所有点评存在你浏览器的 localStorage 里，别人看不到，换设备也没有。<b>联网共享模式</b>：页面地址带上共享后端地址（见 README），同一房间的人写点评会进同一个数据池，互相可见。两种模式是同一份代码，只换存储层。</p>',
+      '<h2>分数怎么算</h2><p>页面上的均分 = 种子示例数据 + 真实点评（每条实时点评按 3 票计入，方便演示时看到变化）。所以你会看到「实时」标记的评论和原有的示例评论放在一起。</p>',
       '<h2>接下来想做的</h2><p>食堂实时拥挤度、课表联动（下课就推最近的窗口）、宿舍楼拼单、以及让食堂经理真的能看到差评并且回一句「已整改」。</p></div>'].join('');
   }
 
@@ -656,6 +702,28 @@
       '<div class="sheet-mask" data-act="close-pic"></div><div class="lightbox"><button class="lb-close" data-act="close-pic" aria-label="关闭">✕</button>' +
       '<img class="lb-img" src="' + src + '" alt="学生实拍">' +
       '<div class="lb-cap"><b>' + (d ? esc(d.name) : "学生实拍") + '</b><small>我上传的实拍图 · 只存在这台设备</small></div></div>';
+    document.body.classList.add("lock");
+  }
+
+  function openCodeSheet(mode) {
+    var isExport = mode === "export";
+    var val = isExport ? window.Store.exportShare() : "";
+    document.getElementById("sheet-root").innerHTML =
+      '<div class="sheet-mask" data-act="close-sheet"></div><div class="sheet">' +
+      '<div class="sheet-head"><b>' + (isExport ? "分享码 · 发给同学粘贴" : "粘贴同学的分享码") + '</b><span class="sheet-close" data-act="close-sheet">✕</span></div>' +
+      '<textarea id="code-box" rows="7" placeholder="把同学发你的那串代码粘到这里">' + (isExport ? esc(val) : "") + '</textarea>' +
+      '<button class="btn primary wide" data-act="' + (isExport ? "copy-code" : "apply-code") + '">' + (isExport ? "复制到剪贴板" : "导入这些评价") + '</button>' +
+      '<p class="sheet-note">分享码就是当前房间的全部点评（含图片），很长是正常的。</p></div>';
+    document.body.classList.add("lock");
+  }
+
+  function openNickSheet() {
+    document.getElementById("sheet-root").innerHTML =
+      '<div class="sheet-mask" data-act="close-sheet"></div><div class="sheet">' +
+      '<div class="sheet-head"><b>改个昵称</b><span class="sheet-close" data-act="close-sheet">✕</span></div>' +
+      '<p class="sheet-sub">不用注册，昵称只存在这台设备，别人看到的就是这个。</p>' +
+      '<input id="nick-box" class="search" maxlength="12" value="' + esc(window.Store.authorName) + '" style="margin-top:12px">' +
+      '<button class="btn primary wide" data-act="apply-nick">保存</button></div>';
     document.body.classList.add("lock");
   }
 
@@ -798,6 +866,35 @@
     if (act === "clear-filter") { S.filters = {}; savePrefs(); render(); toast("筛选清空了，重新挑一次"); return; }
     if (act === "recombo") { S.comboVariant = (S.comboVariant || 0) + 1; savePrefs(); render(true); return; }
     if (act === "pic") { openPic(dById[el.getAttribute("data-id")], +el.getAttribute("data-n")); return; }
+    if (act === "nick") { openNickSheet(); return; }
+    if (act === "apply-nick") {
+      var nm = (document.getElementById("nick-box").value || "").trim().slice(0, 12);
+      if (!nm) { toast("起个名字吧，干饭人"); return; }
+      window.Store.setName(nm);
+      closeSheet(); render(true);
+      toast("改好了，以后你就是「" + nm + "」");
+      return;
+    }
+    if (act === "export") { openCodeSheet("export"); return; }
+    if (act === "import") { openCodeSheet("import"); return; }
+    if (act === "copy-code") {
+      var box = document.getElementById("code-box");
+      if (box) box.select();
+      try {
+        document.execCommand("copy");
+        toast("复制成功，发给同学就行");
+      } catch (e) { toast("长按手动复制吧"); }
+      return;
+    }
+    if (act === "apply-code") {
+      var code = (document.getElementById("code-box").value || "").trim();
+      try {
+        var n = window.Store.importShare(code);
+        recompute(); closeSheet(); render(true);
+        toast("导入了 " + n + " 条评价");
+      } catch (e) { toast("这串码看不懂，确认是不是复制全了"); }
+      return;
+    }
     if (act === "pick-pic") { var fin = document.getElementById("rv-file"); if (fin) fin.click(); return; }
     if (act === "rm-pic") {
       if (window._sheet && window._sheet.pics) window._sheet.pics.splice(+el.getAttribute("data-i"), 1);
@@ -805,8 +902,11 @@
       return;
     }
     if (act === "pic-real") {
-      var mr = myReview(S.dishId);
-      var src = mr && mr.pics && mr.pics[+el.getAttribute("data-i")];
+      var src = el.getAttribute("data-src");
+      if (!src) {
+        var arr = window.Store.picsOf(S.dishId);
+        src = arr[+el.getAttribute("data-i")];
+      }
       if (src) openPicReal(src, dById[S.dishId]);
       return;
     }
@@ -856,31 +956,36 @@
       return;
     }
     if (act === "submit") {
+      if (!window._sheet) { toast("点评面板已关闭，重新点一次花花"); return; }
       if (!window._sheet.flowers) { toast("先点几朵小红花吧，一朵也行"); return; }
       var d = window._sheet.dish;
+      var flowersVal = window._sheet.flowers;
+      var tagsVal = window._sheet.tags.slice();
       var text = (document.getElementById("rv-text").value || "").trim();
-      var entry = {
-        dishId: d.id, flowers: window._sheet.flowers, tags: window._sheet.tags.slice(),
-        text: text, ts: Date.now(), pics: (window._sheet.pics || []).slice()
-      };
-      ME.reviews.push(entry);
-      var ok = save();
-      if (!ok) {
-        entry.pics = [];
-        ok = save();
-        if (ok) toast("浏览器存不下这么多图，先只保留文字");
-      }
-      if (!ok) {
-        ME.reviews.pop();
-        save();
-        toast("本地存储满了，去「我的」删掉几条旧点评再来");
-        return;
-      }
-      closeSheet(); render(true);
-      toast(entry.pics && entry.pics.length ? "🌺 小红花和图都收到了" : "🌺 小红花已戴好，阿姨会看到的（大概）");
+      var pics = (window._sheet.pics || []).slice();
+      // 本地容量兜底：太大就把图降级成纯文字
+      try {
+        var probe = JSON.stringify(window.Store.reviews.concat([{ pics: pics }])).length;
+        if (probe > 3500000) { pics = []; toast("浏览器存不下这么多图，先只保留文字"); }
+      } catch (e) {}
+      closeSheet();
+      window.Store.add({
+        dishId: d.id, flowers: flowersVal, tags: tagsVal,
+        text: text, pics: pics
+      }).then(function () {
+        recompute();
+        render(true);
+        toast(pics.length ? "🌺 小红花和图都收到了" : "🌺 小红花已戴好，阿姨会看到的（大概）");
+      });
     }
   });
 
   window.addEventListener("hashchange", function () { route(); });
-  route();
+  render();
+  if (window.Store) {
+    window.Store.init().then(function () {
+      recompute();
+      render(true);
+    });
+  }
 })();

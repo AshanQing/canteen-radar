@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { JSDOM, VirtualConsole } from "../.tmpdom/node_modules/jsdom/lib/api.js";
 
 let html = fs.readFileSync("index.html", "utf8");
-for (const f of ["data.js", "core.js", "app.js"]) {
+for (const f of ["data.js", "core.js", "store.js", "app.js"]) {
   const code = fs.readFileSync("assets/" + f, "utf8");
   html = html.replace('<script src="assets/' + f + '"></script>', "<script>" + code + "</script>");
 }
@@ -22,6 +22,7 @@ const doc = window.document;
 const q = (s) => doc.querySelectorAll(s);
 const click = (el) => el.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
 
+window.addEventListener("error", (e) => console.log("JS ERROR:", e.message, "|", (e.error && e.error.stack || "").split("\n")[1] || ""));
 console.log("1 首屏渲染:", q("#app .screen").length === 1, "| rec 卡片:", q(".rec").length, "| 导航:", q(".tab").length);
 
 const chip = q('.chip-btn[data-key="cheap"]')[0];
@@ -69,11 +70,14 @@ window._sheet.pics = ["data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAA
 click(q(".fp")[4]);
 click(q('.chip-btn[data-t="真香"]')[0]);
 doc.querySelector("#rv-text").value = "阿姨今天手真的没抖，肉给得比室友的头发还多";
+console.log("DBG sheet:", !!window._sheet, "| flowers:", window._sheet && window._sheet.flowers, "| pics:", window._sheet && window._sheet.pics.length, "| store:", window.Store.reviews.length);
 click(q('[data-act="submit"]')[0]);
 await new Promise((r) => setTimeout(r, 60));
-const saved = JSON.parse(window.localStorage.getItem("fdr_me_v1") || "{}");
-console.log("6 提交持久化:", (saved.reviews || []).length === 1, "| 花数:", saved.reviews && saved.reviews[0] && saved.reviews[0].flowers, "| 带图:", (saved.reviews[0].pics || []).length);
-console.log("6b 我的点评卡:", !!doc.querySelector(".review.mine"), "| 我的实拍图:", q(".review.mine .rv-pic.real").length, "| 实拍区总数:", q(".gallery .rv-pic").length);
+const persisted = JSON.parse(window.localStorage.getItem("fdr_reviews_v2") || "[]");
+console.log("6 提交持久化:", persisted.length === 1, "| 花数:", persisted[0] && persisted[0].flowers, "| 带图:", (persisted[0] && persisted[0].pics || []).length);
+click(q('.rvfilter .chip-btn[data-key="all"]')[0]);
+await new Promise((r) => setTimeout(r, 60));
+console.log("6b 实时评价卡:", q(".review.live").length, "| 实时标记:", q(".live-tag").length, "| 我的署名:", /· 我/.test(doc.body.textContent), "| 实拍区:", q(".gallery .rv-pic").length, "| 均分:", doc.querySelector(".bs-left b").textContent);
 
 window.location.hash = "#/rank";
 await new Promise((r) => setTimeout(r, 60));
@@ -82,6 +86,11 @@ console.log("7 榜单:", q(".rankrow").length, "行");
 window.location.hash = "#/me";
 await new Promise((r) => setTimeout(r, 60));
 console.log("8 我的页:", !!doc.querySelector(".me-card"), "| 我的点评行:", q(".row").length);
+console.log("8b 同步卡:", !!doc.querySelector(".synccard"), "| 模式:", q(".sync-row b")[0] && q(".sync-row b")[0].textContent, "| 房间:", q(".sync-row b")[1] && q(".sync-row b")[1].textContent);
+const code = window.Store.exportShare();
+window.Store.resetRoom();
+const added = window.Store.importShare(code);
+console.log("8c 分享码往返:", code.length, "字符 | 重置后导入:", added, "条 | 房间评价数:", window.Store.reviews.length);
 
 window.location.hash = "#/canteens";
 await new Promise((r) => setTimeout(r, 60));
