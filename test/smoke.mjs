@@ -24,6 +24,10 @@ const click = (el) => el.dispatchEvent(new window.MouseEvent("click", { bubbles:
 
 window.addEventListener("error", (e) => console.log("JS ERROR:", e.message, "|", (e.error && e.error.stack || "").split("\n")[1] || ""));
 console.log("1 首屏渲染:", q("#app .screen").length === 1, "| rec 卡片:", q(".rec").length, "| 导航:", q(".tab").length);
+console.log("1b 引导条:", q(".guide").length, "| 菜品图:", q(".foodimg").length, "| 演示提示:", q(".simpill").length);
+click(q('[data-act="close-guide"]')[0]);
+await new Promise((r) => setTimeout(r, 40));
+console.log("1c 引导可关闭:", q(".guide").length === 0, "| 已记住:", window.localStorage.getItem("fdr_guide_v1"));
 
 const chip = q('.chip-btn[data-key="cheap"]')[0];
 click(chip);
@@ -125,4 +129,11 @@ console.log("11e 图标已更新:", q(".themebtn")[0].textContent);
 click(q(".themebtn")[0]);
 await new Promise((r) => setTimeout(r, 40));
 console.log("11f 切回:", doc.documentElement.getAttribute("data-theme"));
+const simBefore = window.Store.reviews.length;
+window.FDR_SIM.run();
+window.FDR_SIM.run();
+console.log("12a 演示注入:", simBefore, "→", window.Store.reviews.length, "| 模拟作者:", window.Store.reviews.filter(r => /^sim-/.test(r.authorId)).length);
+console.log("12b 注入后仍可用:", q(".rec").length === 3);
 console.log("12 运行错误:", errors.length ? errors.slice(0, 5) : "无");
+window.close();
+process.exit(0);

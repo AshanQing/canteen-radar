@@ -158,6 +158,27 @@
       });
     },
 
+    // 演示模式用：往本地池子里塞一条“别人的”评价
+    addExternal: function (rev) {
+      var item = {
+        id: uid(),
+        room: this.room,
+        dishId: rev.dishId,
+        authorId: rev.authorId || ("sim-" + Math.random().toString(36).slice(2, 6)),
+        authorName: rev.authorName || "路过的同学",
+        avatar: rev.avatar || "🐱",
+        flowers: rev.flowers,
+        tags: rev.tags || [],
+        text: rev.text || "",
+        pics: rev.pics || [],
+        createdAt: new Date().toISOString()
+      };
+      this.reviews.push(item);
+      this.cache();
+      this.emit();
+      return item;
+    },
+
     flushOutbox: function () {
       var self = this;
       if (this.mode !== "remote" || !this.online) return;

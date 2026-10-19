@@ -136,7 +136,12 @@
 
   var PIC_COUNTS = [2, 1, 0, 2, 1, 0, 1];
 
-  function toneOf(d, n) { return (hash(d.id) + n * 37) % 5; }
+  function toneOf(d, n) { return (hash(d.id) + (n || 0) * 37) % 5; }
+
+  // 用 CSS 叠出来的“菜品图”，比纯 emoji 更像美食卡片
+  function foodTile(d, size) {
+    return '<span class="foodimg tone-' + toneOf(d, 0) + ' ' + (size || "md") + '"><i></i><em>' + d.emoji + '</em></span>';
+  }
   function picTile(d, n, cls) {
     return '<button class="rv-pic tone-' + toneOf(d, n) + (cls ? " " + cls : "") + '" data-act="pic" data-id="' + d.id + '" data-n="' + n + '" aria-label="查看' + esc(d.name) + '的学生实拍图"><span>' + d.emoji + '</span></button>';
   }
@@ -276,6 +281,53 @@
     return { t: "夜宵时间", s: "四食堂还亮着灯，罪恶感先放一边。", icon: "🌙" };
   }
 
+  var GUIDE_KEY = "fdr_guide_v1";
+  var SIM_KEY = "fdr_sim_off";
+
+  function guideHtml() {
+    try { if (localStorage.getItem(GUIDE_KEY)) return ""; } catch (e) {}
+    return '<div class="guide"><div class="guide-ico">👋</div><div class="guide-body"><b>这是求职作品 demo，30 秒看懂</b>' +
+      '<p>① 点开任意一道菜 → 点「👎 只看差评」　② 详情页里点「把这盘配成一套」　③ 右上角 🌙 切夜间模式</p></div>' +
+      '<button class="guide-x" data-act="close-guide" aria-label="关闭引导">✕</button></div>';
+  }
+
+  function simOn() {
+    try { return !localStorage.getItem(SIM_KEY) && window.Store.mode !== "remote"; } catch (e) { return false; }
+  }
+
+  function makeSimReview() {
+    var d = DISHES[Math.floor(Math.random() * DISHES.length)];
+    var stars = [5, 5, 5, 4, 4, 4, 3, 3, 2, 1];
+    var star = stars[Math.floor(Math.random() * stars.length)];
+    var pool = { "1": T1, "2": T2, "3": T3, "4": T4, "5": T5 }[String(star)];
+    var tpl = pool[Math.floor(Math.random() * pool.length)];
+    return {
+      dishId: d.id,
+      flowers: star,
+      tags: d.tags.slice(0, 2),
+      text: tpl.replace("{n}", d.name).replace("{p}", money(d.price)).replace("{w}", String(d.wait)).replace("{f}", flawOf(d)),
+      authorName: NAMES[Math.floor(Math.random() * NAMES.length)],
+      avatar: AVATARS[Math.floor(Math.random() * AVATARS.length)],
+      authorId: "sim-" + Math.random().toString(36).slice(2, 5)
+    };
+  }
+
+  function softRender() {
+    var ae = document.activeElement;
+    if (ae && /INPUT|TEXTAREA/.test(ae.tagName)) return;
+    if (document.body.classList.contains("lock")) return;
+    render(true);
+  }
+
+  function runSim() {
+    if (!simOn()) return;
+    var simCount = window.Store.reviews.filter(function (r) { return /^sim-/.test(r.authorId); }).length;
+    if (simCount >= 60) return;
+    window.Store.addExternal(makeSimReview());
+    recompute();
+    softRender();
+  }
+
   function viewToday() {
     var p = period();
     var list = filtered();
@@ -289,6 +341,8 @@
 
     var h = [];
     h.push('<header class="topbar"><div class="brand"><span class="brand-mark">🍚</span><div><b>食堂雷达</b><small>' + D.school + '</small></div></div><a class="ghost-btn" href="#/about">这是啥</a></header>');
+    h.push(guideHtml());
+    if (simOn()) h.push('<div class="simpill">🟢 演示模式：正在模拟其他同学的点评</div>');
     h.push('<section class="hero"><div class="hero-icon">' + p.icon + '</div><div><h1>' + p.t + '，今天吃这个</h1><p>' + p.s + '</p></div></section>');
 
     var chips = [["cheap", "💸 10 块内"], ["nowait", "🏃 不排队"], ["spicy", "🌶️ 想吃辣"], ["light", "🥬 清淡点"], ["protein", "💪 高蛋白"], ["fresh", "🆕 没吃过"]];
@@ -307,7 +361,7 @@
     picks.forEach(function (x) {
       var d = x.d;
       h.push('<article class="card rec" data-act="go" data-href="#/dish/' + d.id + '">' +
-        '<div class="rec-head"><div class="rec-emoji">' + d.emoji + '</div>' +
+        '<div class="rec-head">' + foodTile(d, "md") +
         '<div class="rec-main"><h3>' + esc(d.name) + (d.isNew ? ' <span class="tag-new">新</span>' : '') + '</h3>' +
         '<p class="rec-sub">' + d.canteen.name + ' · ' + d.win.name + ' · ' + money(d.price) + '</p></div>' +
         '<div class="rec-score"><b>' + d.avg.toFixed(1) + '</b><span>🌸</span></div></div>' +
@@ -334,7 +388,7 @@
     h.push('<div class="section-title"><span>今日上新 · 试吃官已就位</span><small>新菜先让雷达的同学试毒</small></div>');
     h.push('<div class="hstrip hscroll">');
     newOnes.forEach(function (d) {
-      h.push('<a class="mini" href="#/dish/' + d.id + '"><div class="mini-emoji">' + d.emoji + '</div><b>' + esc(d.name) + '</b><span>' + money(d.price) + ' · 🌸' + d.avg.toFixed(1) + '</span><span class="mini-note">' + d.votes + ' 人试过</span></a>');
+      h.push('<a class="mini" href="#/dish/' + d.id + '">' + foodTile(d, "sm") + '<b>' + esc(d.name) + '</b><span>' + money(d.price) + ' · 🌸' + d.avg.toFixed(1) + '</span><span class="mini-note">' + d.votes + ' 人试过</span></a>');
     });
     h.push('</div>');
 
@@ -396,7 +450,7 @@
       } else {
         var d = r.d;
         h.push('<li class="rankrow" data-act="go" data-href="#/dish/' + d.id + '"><span class="rankno">' + r.n + '</span>' +
-          '<span class="rankemoji">' + d.emoji + '</span><div class="rankmain"><b>' + esc(d.name) + '</b><small>' + esc(r.note) + '</small></div><span class="rankval">' + r.val + '</span></li>');
+          foodTile(d, "sm") + '<div class="rankmain"><b>' + esc(d.name) + '</b><small>' + esc(r.note) + '</small></div><span class="rankval">' + r.val + '</span></li>');
       }
     });
     h.push('</ol>');
@@ -415,7 +469,7 @@
       });
       h.push('<div class="section-title"><span>搜到 ' + hit.length + ' 道</span></div><div class="list">');
       hit.forEach(function (d) {
-        h.push('<div class="row" data-act="go" data-href="#/dish/' + d.id + '"><span class="row-emoji">' + d.emoji + '</span><div class="row-main"><b>' + esc(d.name) + '</b><small>' + d.canteen.name + ' · ' + d.win.name + '</small></div><span class="row-val">' + money(d.price) + '</span></div>');
+        h.push('<div class="row" data-act="go" data-href="#/dish/' + d.id + '">' + foodTile(d, "xs") + '<div class="row-main"><b>' + esc(d.name) + '</b><small>' + d.canteen.name + ' · ' + d.win.name + '</small></div><span class="row-val">' + money(d.price) + '</span></div>');
       });
       if (!hit.length) h.push('<p class="hint">雷达扫不到这道菜，可能被阿姨收走了。</p>');
       h.push('</div>');
@@ -475,7 +529,7 @@
     var galleryPics = window.Store.picsOf(d.id);
     var total = d.dist.reduce(function (a, b) { return a + b; }, 0);
     var h = ['<header class="topbar"><a class="ghost-btn" href="javascript:history.back()">← 返回</a><div class="brand"><div><b>' + esc(d.name) + '</b><small>' + d.canteen.name + ' · ' + d.win.name + '</small></div></div></header>'];
-    h.push('<section class="dish-hero"><div class="dish-emoji">' + d.emoji + '</div><div><div class="dish-price">' + money(d.price) + ' <small>/ ' + d.kcal + ' kcal</small></div><p class="dish-desc">' + esc(d.desc) + '</p>' +
+    h.push('<section class="dish-hero">' + foodTile(d, "lg") + '<div><div class="dish-price">' + money(d.price) + ' <small>/ ' + d.kcal + ' kcal</small></div><p class="dish-desc">' + esc(d.desc) + '</p>' +
       '<div class="dish-tags">' + d.tags.map(function (t) { return '<span class="tag">' + t + '</span>'; }).join('') + riskChip(d) + '</div></div></section>');
     h.push('<div class="bigscore"><div class="bs-left"><b>' + d.avg.toFixed(1) + '</b><span>🌸 均分</span></div><div class="bs-right"><div class="bs-line">' + d.votes + ' 朵小红花 · 好评率 ' + pct(d.goodRate) + '</div><div class="bs-line">二刷率 ' + pct(d.repeat) + ' · 现在排队约 ' + d.wait + ' 分钟</div><div class="dist">');
     d.dist.forEach(function (c, i) {
@@ -563,7 +617,7 @@
       .sort(function (a, b) { return b.avg - a.avg; }).slice(0, 3);
     h.push('<div class="section-title"><span>如果这盘不保险</span><small>同类里更稳的</small></div><div class="hstrip">');
     sim.forEach(function (x) {
-      h.push('<a class="mini" href="#/dish/' + x.id + '"><div class="mini-emoji">' + x.emoji + '</div><b>' + esc(x.name) + '</b><span>🌸 ' + x.avg.toFixed(1) + ' · ' + money(x.price) + '</span><span class="mini-note">雷率 ' + pct(x.ray) + '</span></a>');
+      h.push('<a class="mini" href="#/dish/' + x.id + '">' + foodTile(x, "sm") + '<b>' + esc(x.name) + '</b><span>🌸 ' + x.avg.toFixed(1) + ' · ' + money(x.price) + '</span><span class="mini-note">雷率 ' + pct(x.ray) + '</span></a>');
     });
     h.push('</div>');
     return h.join('');
@@ -583,7 +637,8 @@
       '<div class="sync-row"><span>数据模式</span><b>' + (window.Store.mode === "remote" ? "联网共享" : "仅本机") + '</b></div>' +
       '<div class="sync-row"><span>房间</span><b>' + esc(window.Store.room) + '</b></div>' +
       '<div class="sync-row"><span>状态</span><b>' + esc(window.Store.status) + '</b></div>' +
-      '<div class="sync-acts"><button class="btn ghost" data-act="export">导出分享码</button><button class="btn ghost" data-act="import">导入同学的评价</button></div>' +
+      '<div class="sync-row"><span>演示模式</span><b>' + (simOn() ? "开启（模拟他人点评）" : "关闭") + '</b></div>' +
+      '<div class="sync-acts"><button class="btn ghost" data-act="export">导出分享码</button><button class="btn ghost" data-act="import">导入同学的评价</button><button class="btn ghost" data-act="sim-toggle">' + (simOn() ? "关闭演示" : "开启演示") + '</button></div>' +
       '<p class="sync-note">仅本机模式：点评只存在这台设备。连上共享后端后，同一房间的人能互相看到彼此的点评。</p></div>');
 
     h.push('<div class="section-title"><span>我的口味画像</span><small>根据你的小红花算的</small></div>');
@@ -866,6 +921,20 @@
     if (act === "clear-filter") { S.filters = {}; savePrefs(); render(); toast("筛选清空了，重新挑一次"); return; }
     if (act === "recombo") { S.comboVariant = (S.comboVariant || 0) + 1; savePrefs(); render(true); return; }
     if (act === "pic") { openPic(dById[el.getAttribute("data-id")], +el.getAttribute("data-n")); return; }
+    if (act === "close-guide") {
+      try { localStorage.setItem(GUIDE_KEY, "1"); } catch (e) {}
+      render(true);
+      return;
+    }
+    if (act === "sim-toggle") {
+      try {
+        if (simOn()) localStorage.setItem(SIM_KEY, "1");
+        else localStorage.removeItem(SIM_KEY);
+      } catch (e) {}
+      render(true);
+      toast(simOn() ? "演示模式已开启，等十几秒就有“别的同学”出现" : "演示模式已关闭");
+      return;
+    }
     if (act === "nick") { openNickSheet(); return; }
     if (act === "apply-nick") {
       var nm = (document.getElementById("nick-box").value || "").trim().slice(0, 12);
@@ -988,4 +1057,6 @@
       render(true);
     });
   }
+  setInterval(runSim, 12000);
+  window.FDR_SIM = { run: runSim, on: simOn };
 })();
