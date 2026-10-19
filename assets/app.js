@@ -316,7 +316,9 @@
     var ae = document.activeElement;
     if (ae && /INPUT|TEXTAREA/.test(ae.tagName)) return;
     if (document.body.classList.contains("lock")) return;
-    if (!/^#\/(today|rank|dish)/.test(location.hash || "#/today")) return;
+    var h = location.hash || "#/today";
+    if (h === "#" || h === "") h = "#/today";
+    if (!/^#\/(today|rank|dish|canteen)/.test(h)) return;
     render(true);
   }
 
@@ -324,9 +326,31 @@
     if (!simOn()) return;
     var simCount = window.Store.reviews.filter(function (r) { return /^sim-/.test(r.authorId); }).length;
     if (simCount >= 60) return;
-    window.Store.addExternal(makeSimReview());
+    var sim = makeSimReview();
+    window.Store.addExternal(sim);
     recompute();
     softRender();
+    var now = Date.now();
+    if (!window._lastSimToast || now - window._lastSimToast > 45000) {
+      window._lastSimToast = now;
+      var dd = dById[sim.dishId];
+      toast("📣 隔壁楼刚有人给「" + (dd ? dd.name : "某道菜") + "」打了 " + sim.flowers + " 朵花");
+    }
+  }
+
+  function liveStrip() {
+    var latest = window.Store.reviews.slice().reverse().slice(0, 4);
+    if (!latest.length) return "";
+    var h = ['<div class="section-title"><span>同学刚刚说</span><small>本地演示 · 每 12 秒来一条</small></div><div class="livecards hscroll">'];
+    latest.forEach(function (r) {
+      var d = dById[r.dishId];
+      if (!d) return;
+      h.push('<a class="livecard" href="#/dish/' + d.id + '"><div class="lc-top"><span class="lc-ava">' + (r.avatar || "🐱") + '</span><b>' + esc(r.authorName) + '</b><span class="lc-flower">' + flowers(r.flowers) + '</span></div>' +
+        '<p class="lc-text">' + esc((r.text || "").slice(0, 34)) + '</p>' +
+        '<div class="lc-foot">' + foodTile(d, "xs") + '<span>' + esc(d.name) + ' · ' + relTime(r.createdAt) + '</span></div></a>');
+    });
+    h.push('</div>');
+    return h.join("");
   }
 
   function viewToday() {
@@ -393,6 +417,7 @@
     });
     h.push('</div>');
 
+    h.push(liveStrip());
     h.push('<div class="alert"><div class="alert-ico">⚡</div><div><b>踩雷预警：' + esc(danger.name) + '</b><p>雷率 ' + pct(danger.ray) + '，最近有人说「' + esc(flawOf(danger)) + '」。</p></div><a href="#/dish/' + danger.id + '">围观</a></div>');
     h.push('<div class="proof">👀 你宿舍楼今天有 <b>' + (3 + (S.order % 4)) + '</b> 个人吃了「' + esc(picks[0].d.name) + '」，目前没人喊退钱。</div>');
     return h.join('');
@@ -1056,6 +1081,8 @@
     window.Store.init().then(function () {
       recompute();
       render(true);
+      // 打开后 4 秒来第一条，演示时不用干等
+      setTimeout(runSim, 4000);
     });
   }
   setInterval(runSim, 12000);

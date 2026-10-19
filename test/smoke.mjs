@@ -133,7 +133,15 @@ const simBefore = window.Store.reviews.length;
 window.FDR_SIM.run();
 window.FDR_SIM.run();
 console.log("12a 演示注入:", simBefore, "→", window.Store.reviews.length, "| 模拟作者:", window.Store.reviews.filter(r => /^sim-/.test(r.authorId)).length);
-console.log("12b 注入后仍可用:", q(".rec").length === 3);
+console.log("12b 注入后仍可用:", q(".rec").length === 3, "| 首页实时条:", q(".livecard").length, "| hash:", JSON.stringify(window.location.hash));
+
+// 复现你遇到的场景：刚打开、地址栏没有 #/today
+window.location.hash = "";
+await new Promise((r) => setTimeout(r, 60));
+const stripBefore = q(".livecard").length;
+window.FDR_SIM.run();
+await new Promise((r) => setTimeout(r, 60));
+console.log("12c 空 hash 场景:", JSON.stringify(window.location.hash), "| 注入前:", stripBefore, "→ 注入后:", q(".livecard").length);
 console.log("12 运行错误:", errors.length ? errors.slice(0, 5) : "无");
 window.close();
 process.exit(0);
