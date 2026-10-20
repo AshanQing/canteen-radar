@@ -2,3 +2,6 @@
 node_modules/
 preview/
 mk.cjs
+tools/shot-pages/
+tools/frames/
+docs/shots/_*
