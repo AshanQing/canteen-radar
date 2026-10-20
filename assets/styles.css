@@ -537,6 +537,86 @@ textarea:focus{border-color:var(--brand)}
 .lrow-flower{margin-left:auto;font-size:10px;letter-spacing:-1px}
 .lrow-text{font-size:12px;color:var(--ink-2);line-height:1.5}
 .lrow-foot{font-size:10.5px;color:var(--muted)}
+/* ---------- 出餐预测 ---------- */
+.waitbox{display:flex;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);
+  border-radius:18px;padding:13px 15px;margin-top:12px;box-shadow:var(--shadow)}
+.wb-left{text-align:center;padding-right:14px;border-right:1px dashed var(--line);min-width:74px}
+.wb-left b{display:block;font-size:26px;color:var(--brand-ink);line-height:1}
+.wb-left span{font-size:10.5px;color:var(--muted)}
+.wb-right{flex:1;min-width:0}
+.wb-line{font-size:12px;color:var(--ink-2);line-height:1.5}
+.wb-tag{display:inline-block;font-size:10px;background:var(--chip);border-radius:999px;padding:2px 8px;
+  margin-right:6px;color:var(--ink-2)}
+.wb-bar{height:6px;border-radius:999px;background:var(--chip);margin-top:8px;overflow:hidden}
+.wb-bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--brand-2),var(--brand))}
+
+/* ---------- 整改公告 ---------- */
+.fixbox{background:var(--ok-bg);border:1px solid var(--ok);border-radius:16px;padding:12px 14px;margin-top:12px}
+.fix-head{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;font-weight:700;color:var(--ok)}
+.fix-head small{font-weight:400;color:var(--muted)}
+.fixbox p{font-size:11.5px;color:var(--ink-2);margin-top:4px;line-height:1.5}
+.fix-cta{display:inline-block;font-size:11px;color:var(--ok);margin-top:6px;font-weight:600}
+.winnotice{display:flex;flex-direction:column;gap:2px;background:var(--ok-bg);border:1px solid var(--ok);
+  border-radius:12px;padding:9px 11px;margin-bottom:8px}
+.winnotice b{font-size:11.5px;color:var(--ok)}
+.winnotice span{font-size:11px;color:var(--ink-2)}
+
+/* ---------- 口味雷达 ---------- */
+.radar-wrap{display:flex;justify-content:center;padding:2px 0}
+.radar{width:216px;height:216px}
+.rd-label{font-size:9px;fill:var(--muted)}
+.radar-empty{height:170px;display:grid;place-items:center;font-size:12px;color:var(--muted);text-align:center;line-height:1.6}
+.radar-note{font-size:11.5px;color:var(--muted);text-align:center;margin-top:2px}
+
+/* ---------- 干饭日程 ---------- */
+.weekstrip{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
+.weekstrip::-webkit-scrollbar{display:none}
+.daycell{flex:1 0 46px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0;
+  border-radius:14px;background:var(--surface);border:1px solid var(--line)}
+.daycell.on{background:var(--chip-on);border-color:var(--chip-on)}
+.daycell.on .dc-w,.daycell.on .dc-d{color:var(--chip-on-ink)}
+.dc-w{font-size:10px;color:var(--muted)}
+.dc-d{font-size:15px;font-weight:700}
+.dc-dots{display:flex;gap:2px;height:6px;align-items:center}
+.dot{width:4px;height:4px;border-radius:50%;display:block}
+.dot.plan{background:var(--brand)}
+.dot.promo{background:#F5A623}
+
+.planlist{display:flex;flex-direction:column;gap:8px}
+.slot{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);
+  border-radius:14px;padding:11px 13px;text-align:left;width:100%}
+.slot-ico{font-size:18px}
+.slot-main{flex:1;min-width:0}
+.slot-main b{display:block;font-size:13px}
+.slot-main small{font-size:11px;color:var(--muted)}
+.slot-add{width:34px;height:34px;border-radius:10px;background:var(--chip);display:grid;place-items:center;
+  color:var(--brand-ink);font-size:16px;flex:0 0 34px}
+.plan-acts{display:flex;gap:8px;margin-top:10px}
+.plan-acts .btn{flex:1}
+
+.promolist{display:flex;flex-direction:column;gap:8px}
+.promo{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);
+  border-radius:14px;padding:10px 12px}
+.promo-tag{font-size:10px;background:var(--warn-bg);color:var(--warn);border-radius:999px;padding:3px 8px;flex:0 0 auto}
+.promo-main{flex:1;min-width:0}
+.promo-main b{display:block;font-size:12.5px}
+.promo-main small{font-size:11px;color:var(--muted)}
+
+.remindbox{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);
+  border-radius:16px;padding:12px 14px;margin-top:14px}
+.remindbox b{font-size:13px}
+.remindbox p{font-size:11px;color:var(--muted);margin-top:2px}
+.remindbox .btn{flex:0 0 auto}
+
+.plan-pick{display:flex;flex-direction:column;margin-top:8px;max-height:56vh;overflow-y:auto}
+.planrow{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line);
+  text-align:left;width:100%}
+.planrow-main{flex:1;min-width:0}
+.planrow-main b{display:block;font-size:13px}
+.planrow-main small{font-size:11px;color:var(--muted)}
+.planrow-score{font-size:12px;color:var(--brand-ink);font-weight:700}
+.tab{padding:4px 8px}
+
 
 
 

@@ -90,7 +90,8 @@
     if ((r.meal || 0) > 0.85 && ctx.mealLabel) out.push(ctx.mealLabel + "就该吃这个，不折腾");
     if (!ctx.eaten) out.push(d.isNew ? "全校还没几个人吃过，你是先锋" : "你还没吃过，雷达替你排了队");
     if (r.good > 0.82) out.push("老客好评 " + Math.round(ctx.goodRate * 100) + "%，不是刷的");
-    if (d.wait <= 5) out.push("现在排队约 " + d.wait + " 分钟，够你吃完再冲教室");
+    var wm = ctx.waitMins != null ? ctx.waitMins : d.wait;
+    if (wm <= 5) out.push("现在排队约 " + wm + " 分钟，够你吃完再冲教室");
     if (d.price <= 10) out.push("¥" + d.price + "，月底干饭人不心疼");
     if (r.taste > 0.85) out.push("口味分 " + ctx.avg.toFixed(1) + "，属于宿舍群里会被 @ 的那种");
     if (ctx.ray < 0.08) out.push("雷率仅 " + Math.round(ctx.ray * 100) + "%，踩雷概率很低");
@@ -103,6 +104,60 @@
     return ctx.wilson * Math.log(1 + ctx.votes) * (ctx.decay == null ? 1 : ctx.decay);
   }
 
+
+  /* ---------- 出餐 / 排队时间预测 ---------- */
+  function seasonOf(date) {
+    var m = (date || new Date()).getMonth() + 1;
+    if (m >= 3 && m <= 5) return "spring";
+    if (m >= 6 && m <= 8) return "summer";
+    if (m >= 9 && m <= 11) return "autumn";
+    return "winter";
+  }
+
+  function peakFactor(hour) {
+    if ((hour >= 7.3 && hour <= 8.5) || (hour >= 11.6 && hour <= 12.7) || (hour >= 17.6 && hour <= 18.7)) return 1.22;
+    if ((hour >= 6.5 && hour < 7.3) || (hour > 8.5 && hour <= 9.6) ||
+        (hour >= 11.0 && hour < 11.6) || (hour > 12.7 && hour <= 13.6) ||
+        (hour >= 17.0 && hour < 17.6) || (hour > 18.7 && hour <= 19.6)) return 1.0;
+    if (hour >= 21 || hour < 6) return 0.55;
+    return 0.82;
+  }
+
+  function predictWait(d, opts) {
+    opts = opts || {};
+    var date = opts.date || new Date();
+    var hour = date.getHours() + date.getMinutes() / 60;
+    var peak = peakFactor(hour);
+    var workday = opts.workday != null ? opts.workday : (date.getDay() >= 1 && date.getDay() <= 5);
+    var weekend = workday ? 1 : 0.78;
+    var seasonF = { spring: 1.0, summer: 0.96, autumn: 1.0, winter: 1.08 }[seasonOf(date)];
+    var complexity = /现炒|铁板|拉面|拉条|香锅|烧烤/.test(d.name) ? 1.12
+      : /包子|粥|茶叶蛋|盖饭|蛋炒饭/.test(d.name) ? 0.88 : 1;
+    var crowd = (d.win && d.win.crowd) || 0.6;
+    var base = d.wait || 8;
+    var factor = function (h) { return peakFactor(h) * weekend * seasonF * complexity * (0.9 + crowd * 0.2); };
+    var mins = Math.max(2, Math.round(base * factor(hour)));
+
+    // 错峰建议：10 分钟后再看一次
+    var later = new Date(date.getTime() + 10 * 60000);
+    var laterHour = later.getHours() + later.getMinutes() / 60;
+    var laterMins = Math.max(2, Math.round(base * factor(laterHour)));
+    var tip = "";
+    if (mins >= 8 && laterMins <= mins - 3) {
+      tip = "再等 10 分钟过去，大概只要 " + laterMins + " 分钟";
+    } else if (mins <= 4) {
+      tip = "现在是空档，冲";
+    } else if (peak > 1.4) {
+      tip = "正在高峰，建议先占座再点单";
+    }
+    return {
+      mins: mins,
+      laterMins: laterMins,
+      peak: peak >= 1.2 ? "拥挤" : peak >= 0.9 ? "正常" : "空档",
+      season: seasonOf(date),
+      tip: tip
+    };
+  }
 
   /* ---------- 用餐时段 ---------- */
   var MEAL_LABEL = { breakfast: "早餐", lunch: "午餐", dinner: "晚餐", night: "夜宵" };
@@ -213,6 +268,7 @@
 
   globalThis.FDR_CORE = {
     mealOf: mealOf, mealAffinity: mealAffinity, mealScore: mealScore, MEAL_LABEL: MEAL_LABEL,
+    predictWait: predictWait, seasonOf: seasonOf,
     roleOf: roleOf, buildCombo: buildCombo,
     clamp: clamp, buildDist: buildDist, avgOfDist: avgOfDist, wilson: wilson,
     riskOf: riskOf, scoreDish: scoreDish, reasonsFor: reasonsFor, rankScore: rankScore,

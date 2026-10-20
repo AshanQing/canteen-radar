@@ -115,6 +115,31 @@
     return { id: c[0], name: c[1], emoji: c[2], dishIds: c[3], tagline: c[4] };
   });
 
-  globalThis.FDR_DATA = { school: "胆子肥嘟嘟大学", canteens: CANTEENS, windows: WINDOWS, dishes: DISHES, combos: COMBOS };
+  // 窗口「版本更新公告」：整改了什么，什么时候，同学们能不能重新给它一次机会
+  var NOTICES = [
+    { windowId: "w4", ver: "v2.2", date: "10-12", text: "铁板鱿鱼须换供应商，去腥处理，油温下调 10℃", dishId: "d14" },
+    { windowId: "w7", ver: "v2.1", date: "10-08", text: "黄焖豆腐改用老豆腐，提前焯水，不再碎成渣", dishId: "d24" },
+    { windowId: "w8", ver: "v2.0", date: "10-05", text: "黑椒鸡腿堡换酱料，面包现烤；窗口已下架原配方", dishId: "d28" },
+    { windowId: "w13", ver: "v1.9", date: "09-28", text: "螺蛳粉加臭档口独立通风，不再串味到隔壁窗口", dishId: "d43" }
+  ];
+
+  // 已整改菜品的“前后对比”
+  var FIXED = {
+    d14: { ver: "v2.2", date: "10-12", note: "换供应商 + 去腥 + 油温下调", before: 0.38, after: 0.17 },
+    d24: { ver: "v2.1", date: "10-08", note: "改用老豆腐 + 提前焯水", before: 0.31, after: 0.14 },
+    d28: { ver: "v2.0", date: "10-05", note: "换酱料 + 面包现烤", before: 0.42, after: 0.22 }
+  };
+  DISHES.forEach(function (d) { if (FIXED[d.id]) d.fixed = FIXED[d.id]; });
+
+  // 窗口优惠活动（日历上会标出来）
+  var PROMOS = [
+    { id: "p1", windowId: "w11", title: "水果捞第二份半价", when: "每周三 14:00-20:00", day: 3, tag: "半价" },
+    { id: "p2", windowId: "w14", title: "烧烤 8 折", when: "每天 21:00 后", day: null, tag: "夜宵" },
+    { id: "p3", windowId: "w1", title: "红烧肉加量不加价", when: "每周五 11:00-13:00", day: 5, tag: "加量" },
+    { id: "p4", windowId: "w7", title: "黄焖鸡提前下单减 2 元", when: "工作日 11:00-11:30", day: null, tag: "立减" },
+    { id: "p5", windowId: "w9", title: "轻食 7 折", when: "每天 15:00-17:00", day: null, tag: "7折" }
+  ];
+
+  globalThis.FDR_DATA = { school: "胆子肥嘟嘟大学", canteens: CANTEENS, windows: WINDOWS, dishes: DISHES, combos: COMBOS, notices: NOTICES, promos: PROMOS };
 
 })();

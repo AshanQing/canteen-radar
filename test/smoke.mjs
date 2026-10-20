@@ -91,6 +91,7 @@ console.log("7 榜单:", q(".rankrow").length, "行");
 window.location.hash = "#/me";
 await new Promise((r) => setTimeout(r, 60));
 console.log("8 我的页:", !!doc.querySelector(".me-card"), "| 我的点评行:", q(".row").length);
+console.log("8d 口味雷达:", q(".radar").length, "| 轴标签:", q(".rd-label").length, "| 说明:", (q(".radar-note")[0] || {}).textContent);
 console.log("8b 同步卡:", !!doc.querySelector(".synccard"), "| 模式:", q(".sync-row b")[0] && q(".sync-row b")[0].textContent, "| 房间:", q(".sync-row b")[1] && q(".sync-row b")[1].textContent);
 const code = window.Store.exportShare();
 window.Store.resetRoom();
@@ -101,13 +102,34 @@ window.location.hash = "#/canteens";
 await new Promise((r) => setTimeout(r, 60));
 console.log("9 食堂列表:", q(".canteen-card").length);
 
+// 干饭日程
+window.location.hash = "#/plan";
+await new Promise((r) => setTimeout(r, 60));
+console.log("9b 日程周条:", q(".daycell").length, "| 空槽:", q(".slot").length, "| 优惠:", q(".promolist .promo").length);
+click(q('[data-act="plan-auto"]')[0]);
+await new Promise((r) => setTimeout(r, 60));
+console.log("9c 帮我排一天:", Array.from(q(".slot")).map(e => e.querySelector("small").textContent).join(" / "));
+click(q(".slot")[1]);
+await new Promise((r) => setTimeout(r, 40));
+console.log("9d 安排弹层:", q(".planrow").length, "条");
+click(q(".planrow")[0]);
+await new Promise((r) => setTimeout(r, 60));
+console.log("9e 选完后槽位:", q(".slot")[1].querySelector("small").textContent);
+
+// 整改公告
+window.location.hash = "#/dish/d24";
+await new Promise((r) => setTimeout(r, 60));
+console.log("9f 整改公告:", !!doc.querySelector(".fixbox"), "|", (doc.querySelector(".fixbox p") || {}).textContent);
+console.log("9g 出餐框:", !!doc.querySelector(".waitbox"), "|", (doc.querySelector(".wb-line") || {}).textContent);
+
 window.location.hash = "#/canteen/c2";
 await new Promise((r) => setTimeout(r, 60));
 console.log("10 食堂详情窗口:", q(".winblock").length);
 
 window.location.hash = "#/today";
 await new Promise((r) => setTimeout(r, 60));
-console.log("11 首屏推荐理由条数:", q(".why li").length);
+console.log("11 首屏推荐理由:", q(".why-line").length, "条 | 示例:", (q(".why-line")[0] || {}).textContent);
+console.log("11c2 推荐卡排队:", q(".rec-meta span")[1] && q(".rec-meta span")[1].textContent);
 console.log("11z 文案检查 · 出现「穷鬼」:", /穷鬼/.test(doc.body.textContent), "| 搭配名:", q(".combo b")[0].textContent);
 console.log("11y 横向滚动绑定:", !!q(".combos")[0]._wh, "| 箭头按钮:", q(".sec-arrow").length);
 

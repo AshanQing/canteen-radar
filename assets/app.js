@@ -16,6 +16,7 @@
       canteen: cById[win.canteenId], dist: dist,
       avg: C.avgOfDist(dist), good: good, goodRate: good / d.votes,
       wilson: C.wilson(good, d.votes), ray: C.riskOf(dist),
+      fixed: d.fixed || null,
       baseDist: dist.slice(), baseVotes: d.votes
     };
     return o;
@@ -54,7 +55,7 @@
     catch (e) { return false; }
   }
 
-  var S = { filters: {}, order: 0, rank: "flower", q: "", comboOrder: 0, rvFilter: "all", dishId: "", comboVariant: 0, tray: "combo" };
+  var S = { filters: {}, order: 0, rank: "flower", q: "", comboOrder: 0, rvFilter: "all", dishId: "", comboVariant: 0, tray: "combo", planDay: 0 };
   var PREFS_KEY = "fdr_prefs";
   function loadPrefs() {
     try {
@@ -104,7 +105,8 @@
       avg: d.avg, wilson: d.wilson, votes: d.votes, ray: d.ray,
       goodRate: d.goodRate, canteenWalk: d.canteen.walk, eaten: eaten(d.id),
       filters: S.filters,
-      meal: C.mealOf(new Date()), mealLabel: C.MEAL_LABEL[C.mealOf(new Date())]
+      meal: C.mealOf(new Date()), mealLabel: C.MEAL_LABEL[C.mealOf(new Date())],
+      waitMins: C.predictWait(d).mins
     };
   }
   function hash(s) {
@@ -276,6 +278,140 @@
     return list.slice(n).concat(list.slice(0, n));
   }
 
+  /* ---------------- 口味雷达 ---------------- */
+  function radarMetrics() {
+    var rs = window.Store.reviews.filter(function (r) { return r.authorId === window.Store.authorId; });
+    if (!rs.length) return null;
+    var s = { spicy: 0, oil: 0, sweet: 0, salt: 0, kcal: 0, newc: 0, n: 0 };
+    rs.forEach(function (r) {
+      var d = dById[r.dishId];
+      if (!d) return;
+      s.n++;
+      s.spicy += d.spicy;
+      var t = d.tags.join("|");
+      if (/炸物|铁板|夜宵|烧烤/.test(t)) s.oil++;
+      if (/甜品|甜口/.test(t)) s.sweet++;
+      if (/肉食|臭味|辣|香锅|烧烤/.test(t)) s.salt++;
+      s.kcal += d.kcal;
+      if (d.isNew) s.newc++;
+    });
+    var n = s.n || 1;
+    var cl = function (x) { return Math.max(8, Math.min(100, Math.round(x))); };
+    return [
+      ["辣", cl((s.spicy / n / 3) * 100)],
+      ["咸鲜", cl((s.salt / n) * 100)],
+      ["油腻", cl((s.oil / n) * 100)],
+      ["甜口", cl((s.sweet / n) * 100)],
+      ["饭量", cl(s.kcal / n / 8)],
+      ["探索", cl((s.newc / n) * 100 + 30)]
+    ];
+  }
+
+  function radarSvg(m) {
+    var cx = 100, cy = 100, R = 62, n = m.length;
+    function pt(i, r) {
+      var a = -Math.PI / 2 + i * 2 * Math.PI / n;
+      return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+    }
+    var rings = [0.25, 0.5, 0.75, 1].map(function (k) {
+      var ps = [];
+      for (var i = 0; i < n; i++) { var p = pt(i, R * k); ps.push(p[0].toFixed(1) + "," + p[1].toFixed(1)); }
+      return '<polygon points="' + ps.join(" ") + '" fill="none" stroke="var(--line)" stroke-width="1"/>';
+    }).join("");
+    var axes = "", labels = "";
+    for (var i = 0; i < n; i++) {
+      var e = pt(i, R), l = pt(i, R + 16);
+      axes += '<line x1="' + cx + '" y1="' + cy + '" x2="' + e[0].toFixed(1) + '" y2="' + e[1].toFixed(1) + '" stroke="var(--line)" stroke-width="1"/>';
+      labels += '<text x="' + l[0].toFixed(1) + '" y="' + (l[1] + 3).toFixed(1) + '" text-anchor="middle" class="rd-label">' + m[i][0] + '</text>';
+    }
+    var poly = m.map(function (x, idx) { var p = pt(idx, R * x[1] / 100); return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
+    var dots = m.map(function (x, idx) { var p = pt(idx, R * x[1] / 100); return '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="2.8" fill="var(--brand)"/>'; }).join("");
+    return '<svg viewBox="0 0 200 200" class="radar">' + rings + axes +
+      '<polygon points="' + poly + '" fill="rgba(255,107,53,.26)" stroke="var(--brand)" stroke-width="2"/>' + dots + labels + '</svg>';
+  }
+
+  /* ---------------- 干饭日历 ---------------- */
+  function isoDay(offset) {
+    var d = new Date();
+    d.setDate(d.getDate() + (offset || 0));
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+  function plans() {
+    try { return JSON.parse(localStorage.getItem("fdr_plan_v1")) || {}; } catch (e) { return {}; }
+  }
+  function savePlans(p) {
+    try { localStorage.setItem("fdr_plan_v1", JSON.stringify(p)); } catch (e) {}
+  }
+  function remindOn() {
+    try { return localStorage.getItem("fdr_remind_v1") === "1"; } catch (e) { return false; }
+  }
+  function promosOf(dayOffset) {
+    var d = new Date(); d.setDate(d.getDate() + dayOffset);
+    var wd = d.getDay();
+    return (D.promos || []).filter(function (p) { return p.day == null || p.day === wd; });
+  }
+
+  function viewPlan() {
+    var p = plans();
+    var day = S.planDay || 0;
+    var key = isoDay(day);
+    var today = p[key] || {};
+    var slots = [["breakfast", "早餐", "🌅"], ["lunch", "午餐", "🍚"], ["dinner", "晚餐", "🌇"]];
+    var h = ['<header class="topbar"><div class="brand"><span class="brand-mark">📅</span><div><b>干饭日程</b><small>提前排好，到点提醒你</small></div></div></header>'];
+
+    h.push('<div class="weekstrip">');
+    for (var i = 0; i < 7; i++) {
+      var dd = new Date(); dd.setDate(dd.getDate() + i);
+      var k = isoDay(i);
+      var filled = p[k] ? ["breakfast", "lunch", "dinner"].filter(function (s) { return p[k][s]; }).length : 0;
+      var promos = promosOf(i).length;
+      h.push('<button class="daycell' + (i === day ? " on" : "") + '" data-act="plan-day" data-i="' + i + '">' +
+        '<span class="dc-w">' + (i === 0 ? "今天" : "周" + "日一二三四五六"[dd.getDay()]) + '</span>' +
+        '<span class="dc-d">' + dd.getDate() + '</span>' +
+        '<span class="dc-dots">' + (filled ? '<i class="dot plan"></i>' : '') + (promos ? '<i class="dot promo"></i>' : '') + '</span></button>');
+    }
+    h.push('</div>');
+
+    h.push('<div class="section-title"><span>' + (day === 0 ? "今天" : "周" + "日一二三四五六"[new Date(Date.now() + day * 864e5).getDay()]) + '吃什么</span><small>点空格子安排</small></div>');
+    h.push('<div class="planlist">');
+    slots.forEach(function (s) {
+      var d = today[s[0]] ? dById[today[s[0]]] : null;
+      h.push('<button class="slot" data-act="plan-slot" data-slot="' + s[0] + '"><span class="slot-ico">' + s[2] + '</span>' +
+        '<span class="slot-main"><b>' + s[1] + '</b><small>' + (d ? esc(d.name) + " · " + money(d.price) : "还没安排") + '</small></span>' +
+        (d ? foodTile(d, "xs") : '<span class="slot-add">＋</span>') + '</button>');
+    });
+    h.push('</div>');
+    h.push('<div class="plan-acts"><button class="btn primary" data-act="plan-auto">🎲 帮我排一天</button><button class="btn ghost" data-act="plan-clear">清空这天</button></div>');
+
+    h.push('<div class="section-title"><span>窗口优惠 · 值得蹲一下</span><small>日历上有小橙点</small></div><div class="promolist">');
+    (D.promos || []).forEach(function (p) {
+      var w = wById[p.windowId];
+      h.push('<a class="promo" href="#/canteen/' + (w ? w.canteenId : "c1") + '"><span class="promo-tag">' + p.tag + '</span>' +
+        '<span class="promo-main"><b>' + esc(p.title) + '</b><small>' + (w ? esc(w.name) : "") + ' · ' + esc(p.when) + '</small></span></a>');
+    });
+    h.push('</div>');
+
+    h.push('<div class="remindbox"><div><b>🔔 到点提醒</b><p>' + (remindOn() ? "已开启：到饭点前 10 分钟提醒你今天的安排" : "开启后，饭点前提醒你去吃计划好的那顿") + '</p></div>' +
+      '<button class="btn ghost" data-act="remind-toggle">' + (remindOn() ? "关闭" : "开启") + '</button></div>');
+    return h.join("");
+  }
+
+  function openPlanPicker(slot) {
+    var meal = slot;
+    var pool = DISHES.filter(function (d) { return (C.mealAffinity(d)[meal] || 0) > 0; });
+    if (pool.length < 4) pool = DISHES.slice();
+    pool = pool.slice().sort(function (a, b) { return b.avg - a.avg; }).slice(0, 8);
+    var h = ['<div class="sheet-mask" data-act="close-sheet"></div><div class="sheet"><div class="sheet-head"><b>安排' + (slot === "breakfast" ? "早餐" : slot === "lunch" ? "午餐" : "晚餐") + '</b><span class="sheet-close" data-act="close-sheet">✕</span></div><div class="plan-pick">'];
+    pool.forEach(function (d) {
+      h.push('<button class="planrow" data-act="plan-pick" data-slot="' + slot + '" data-id="' + d.id + '">' + foodTile(d, "xs") +
+        '<span class="planrow-main"><b>' + esc(d.name) + '</b><small>' + d.canteen.name + ' · ' + money(d.price) + ' · ⏱ 约 ' + C.predictWait(d).mins + ' 分</small></span>' +
+        '<span class="planrow-score">' + d.avg.toFixed(1) + ' 🌸</span></button>');
+    });
+    h.push('</div></div>');
+    document.getElementById("sheet-root").innerHTML = h.join("");
+    document.body.classList.add("lock");
+  }
+
   /* ---------------- 视图 ---------------- */
   function period() {
     var h = new Date().getHours();
@@ -440,7 +576,7 @@
         '<div class="rec-main"><h3>' + esc(d.name) + (d.isNew ? ' <span class="tag-new">新</span>' : '') + '</h3>' +
         '<p class="rec-sub">' + d.canteen.name + ' · ' + d.win.name + ' · ' + money(d.price) + '</p></div>' +
         '<div class="rec-score"><b>' + d.avg.toFixed(1) + '</b><span>🌸</span></div></div>' +
-        '<div class="rec-meta"><span>🌸 ' + d.votes + '</span><span>⏱ ' + d.wait + ' 分</span>' + riskChip(d) + '</div>' +
+        '<div class="rec-meta"><span>🌸 ' + d.votes + '</span><span>⏱ 约 ' + x.ctx.waitMins + ' 分</span>' + riskChip(d) + '</div>' +
         '<p class="why-line">' + x.reasons.slice(0, 2).map(function (r) { return esc(r); }).join(" · ") + '</p></article>');
     });
     h.push('</div>');
@@ -576,6 +712,8 @@
     wins.forEach(function (w) {
       var ds = DISHES.filter(function (d) { return d.win.id === w.id; }).sort(function (a, b) { return b.avg - a.avg; });
       h.push('<section class="winblock"><div class="win-head"><div><b>' + esc(w.name) + '</b><small>' + w.floor + ' · ' + w.tagline + '</small></div><span class="win-tag">' + ds.length + ' 道</span></div>');
+      var ns = (D.notices || []).filter(function (n) { return n.windowId === w.id; });
+      if (ns.length) h.push('<div class="winnotice"><b>🔧 ' + ns[0].ver + ' 版本更新</b><span>' + ns[0].date + ' · ' + esc(ns[0].text) + '</span></div>');
       h.push('<div class="list">');
       ds.forEach(function (d) {
         h.push('<div class="row" data-act="go" data-href="#/dish/' + d.id + '"><span class="row-emoji">' + d.emoji + '</span><div class="row-main"><b>' + esc(d.name) + (d.isNew ? ' <span class="tag-new">新</span>' : '') + '</b><small>🌸 ' + d.avg.toFixed(1) + ' · ' + d.votes + ' 朵 · ⏱ ' + d.wait + ' 分</small></div><span class="row-val">' + money(d.price) + '</span></div>');
@@ -615,6 +753,17 @@
       h.push('<div class="dist-row"><span>' + (i + 1) + '🌸</span><i style="width:' + Math.round((c / total) * 100) + '%"></i><em>' + c + '</em></div>');
     });
     h.push('</div></div></div>');
+
+    var pw = C.predictWait(d);
+    h.push('<div class="waitbox"><div class="wb-left"><b>' + pw.mins + '</b><span>分钟出餐</span></div>' +
+      '<div class="wb-right"><div class="wb-line"><span class="wb-tag">' + pw.peak + '</span>' + esc(pw.tip || "按当前时段、是否周末和窗口热度预估") + '</div>' +
+      '<div class="wb-bar"><i style="width:' + Math.min(100, pw.mins * 5) + '%"></i></div></div></div>');
+
+    if (d.fixed) {
+      h.push('<div class="fixbox"><div class="fix-head"><span>🔧 已整改 · ' + d.fixed.ver + '</span><small>' + d.fixed.date + '</small></div>' +
+        '<p>' + esc(d.fixed.note) + '，雷率从 ' + Math.round(d.fixed.before * 100) + '% 降到 ' + Math.round(d.fixed.after * 100) + '%</p>' +
+        '<span class="fix-cta">给过它差评的，要不要再试一次？</span></div>');
+    }
 
     if (d.ray >= 0.18) {
       h.push('<div class="alert in-dish"><div class="alert-ico">⚡</div><div><b>踩雷预警 · 雷率 ' + pct(d.ray) + '</b><p>差评集中在「' + esc(flawOf(d)) + '」。头铁可以冲，赶时间建议换一家。</p></div></div>');
@@ -728,7 +877,9 @@
       d.tags.forEach(function (t) { tags[t] = (tags[t] || 0) + 1; });
     });
     var top = Object.keys(tags).sort(function (a, b) { return tags[b] - tags[a]; }).slice(0, 4);
-    h.push('<div class="persona"><b>' + (top.length ? top[0] + "爱好者" : "神秘兮兮的新人") + '</b><p>' + (top.length ? "你给小林花最多的标签是：" + top.join(" / ") + "。" : "先给几道菜戴小红花，雷达才能记住你的口味。") + '</p></div>');
+    var rm = radarMetrics();
+    h.push('<div class="persona"><div class="radar-wrap">' + (rm ? radarSvg(rm) : '<div class="radar-empty">先评几道菜<br>雷达才画得出来</div>') + '</div>' +
+      '<p class="radar-note">' + (rm ? "从你评过的 " + reviews.length + " 道菜算的 · " + (top.length ? "标签偏 " + top.slice(0, 2).join(" / ") : "") : "还没有数据，去给三道菜戴小红花") + '</p></div>');
 
     h.push('<div class="section-title"><span>我的点评</span><small>' + reviews.length + ' 条</small></div>');
     if (!reviews.length) h.push('<p class="hint">还没点评过。去「此刻」随便点开一道菜，给它戴朵花。</p>');
@@ -766,7 +917,7 @@
   }
 
   /* ---------------- 交互 ---------------- */
-  var ROUTES = { today: viewToday, rank: viewRank, canteens: viewCanteens, me: viewMe, about: viewAbout };
+  var ROUTES = { today: viewToday, rank: viewRank, plan: viewPlan, canteens: viewCanteens, me: viewMe, about: viewAbout };
 
   function route() {
     var hashv = (location.hash || "#/today").replace(/^#/, "");
@@ -799,7 +950,7 @@
   }
 
   function nav(active) {
-    var items = [["today", "🍚", "此刻"], ["rank", "🏆", "榜单"], ["canteens", "🏫", "食堂"], ["me", "🐷", "我的"]];
+    var items = [["today", "🍚", "此刻"], ["rank", "🏆", "榜单"], ["plan", "📅", "日程"], ["canteens", "🏫", "食堂"], ["me", "🐷", "我的"]];
     var h = ['<nav class="tabbar">'];
     items.forEach(function (it) {
       h.push('<a class="tab' + (active === it[0] ? " on" : "") + '" href="#/' + it[0] + '"><span>' + it[1] + '</span><small>' + it[2] + '</small></a>');
@@ -1027,6 +1178,52 @@
     if (act === "recombo") { S.comboVariant = (S.comboVariant || 0) + 1; savePrefs(); render(true); return; }
     if (act === "pic") { openPic(dById[el.getAttribute("data-id")], +el.getAttribute("data-n")); return; }
     if (act === "tray") { S.tray = el.getAttribute("data-key"); render(true); return; }
+    if (act === "plan-day") { S.planDay = +el.getAttribute("data-i"); render(true); return; }
+    if (act === "plan-slot") { openPlanPicker(el.getAttribute("data-slot")); return; }
+    if (act === "plan-pick") {
+      var pk = isoDay(S.planDay || 0), pAll = plans();
+      pAll[pk] = pAll[pk] || {};
+      pAll[pk][el.getAttribute("data-slot")] = el.getAttribute("data-id");
+      savePlans(pAll);
+      closeSheet();
+      render(true);
+      toast("安排上了，到点我提醒你");
+      return;
+    }
+    if (act === "plan-auto") {
+      var k2 = isoDay(S.planDay || 0), pa = plans();
+      pa[k2] = pa[k2] || {};
+      var names = [];
+      ["breakfast", "lunch", "dinner"].forEach(function (slot) {
+        var cands = DISHES.filter(function (d) { return (C.mealAffinity(d)[slot] || 0) > 0; });
+        if (!cands.length) cands = DISHES.slice();
+        var best = cands.map(function (d) { return { d: d, s: C.scoreDish(d, ctxOf(d)).score }; })
+          .sort(function (a, b) { return b.s - a.s; })[0].d;
+        pa[k2][slot] = best.id;
+        names.push(best.name);
+      });
+      savePlans(pa);
+      render(true);
+      toast("排好了：" + names.join(" / "));
+      return;
+    }
+    if (act === "plan-clear") {
+      var k3 = isoDay(S.planDay || 0), pc = plans();
+      delete pc[k3];
+      savePlans(pc);
+      render(true);
+      toast("这天清空了，重新安排吧");
+      return;
+    }
+    if (act === "remind-toggle") {
+      try {
+        if (remindOn()) localStorage.removeItem("fdr_remind_v1");
+        else localStorage.setItem("fdr_remind_v1", "1");
+      } catch (e) {}
+      render(true);
+      toast(remindOn() ? "🔔 提醒已开启（demo 里只是记下来，不会真弹通知）" : "提醒已关闭");
+      return;
+    }
     if (act === "live-list") { openLiveList(); return; }
     if (act === "live-go") {
       var href = el.getAttribute("data-href");
