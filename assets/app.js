@@ -54,7 +54,7 @@
     catch (e) { return false; }
   }
 
-  var S = { filters: {}, order: 0, rank: "flower", q: "", comboOrder: 0, rvFilter: "all", dishId: "" };
+  var S = { filters: {}, order: 0, rank: "flower", q: "", comboOrder: 0, rvFilter: "all", dishId: "", comboVariant: 0, tray: "combo" };
   var PREFS_KEY = "fdr_prefs";
   function loadPrefs() {
     try {
@@ -103,7 +103,8 @@
     return {
       avg: d.avg, wilson: d.wilson, votes: d.votes, ray: d.ray,
       goodRate: d.goodRate, canteenWalk: d.canteen.walk, eaten: eaten(d.id),
-      filters: S.filters
+      filters: S.filters,
+      meal: C.mealOf(new Date()), mealLabel: C.MEAL_LABEL[C.mealOf(new Date())]
     };
   }
   function hash(s) {
@@ -243,6 +244,10 @@
       if (f.fresh && eaten(d.id)) return false;
       return true;
     });
+    // 先只给符合当前时段习惯的，太少就放宽
+    var meal = C.mealOf(new Date());
+    var byMeal = list.filter(function (d) { return (C.mealAffinity(d)[meal] || 0) > 0; });
+    return byMeal.length >= 6 ? byMeal : list;
   }
 
   function combos() {
@@ -338,19 +343,36 @@
     }
   }
 
-  function liveStrip() {
-    var latest = window.Store.reviews.slice().reverse().slice(0, 4);
-    if (!latest.length) return "";
-    var h = ['<div class="section-title"><span>同学刚刚说</span><small>本地演示 · 每 12 秒来一条</small></div><div class="livecards hscroll">'];
-    latest.forEach(function (r) {
-      var d = dById[r.dishId];
-      if (!d) return;
-      h.push('<a class="livecard" href="#/dish/' + d.id + '"><div class="lc-top"><span class="lc-ava">' + (r.avatar || "🐱") + '</span><b>' + esc(r.authorName) + '</b><span class="lc-flower">' + flowers(r.flowers) + '</span></div>' +
-        '<p class="lc-text">' + esc((r.text || "").slice(0, 34)) + '</p>' +
-        '<div class="lc-foot">' + foodTile(d, "xs") + '<span>' + esc(d.name) + ' · ' + relTime(r.createdAt) + '</span></div></a>');
-    });
-    h.push('</div>');
-    return h.join("");
+  var lastLiveLen = -1, liveIdx = 0;
+
+  function liveText(r) {
+    var d = dById[r.dishId];
+    return r.authorName + " 刚给「" + (d ? d.name : "这道菜") + "」打了 " + r.flowers + " 朵花 · " + relTime(r.createdAt);
+  }
+
+  function liveBanner() {
+    var list = window.Store.reviews.slice().reverse();
+    var fresh = list.length > lastLiveLen && lastLiveLen >= 0;
+    lastLiveLen = list.length;
+    if (!list.length) {
+      return '<div class="livebar idle" id="livebar"><span class="lb-badge">📢</span><span class="lb-text">还没有实时点评，等第一条…</span></div>';
+    }
+    var r = list[liveIdx % list.length], d = dById[r.dishId];
+    return '<button class="livebar' + (fresh ? " fresh" : "") + '" id="livebar" data-act="live-jump" data-id="' + (d ? d.id : "") + '">' +
+      '<span class="lb-badge">📢</span><span class="lb-text" id="lb-text">' + esc(liveText(r)) + '</span>' +
+      '<span class="lb-go">去看看 ›</span></button>';
+  }
+
+  function rotateLive() {
+    var el = document.getElementById("lb-text"), bar = document.getElementById("livebar");
+    if (!el || !bar) return;
+    var list = window.Store.reviews.slice().reverse();
+    if (!list.length) return;
+    liveIdx++;
+    var r = list[liveIdx % list.length], d = dById[r.dishId];
+    el.textContent = liveText(r);
+    bar.setAttribute("data-id", d ? d.id : "");
+    if (bar.classList.contains("fresh")) setTimeout(function () { bar.classList.remove("fresh"); }, 1600);
   }
 
   function viewToday() {
@@ -367,8 +389,16 @@
     var h = [];
     h.push('<header class="topbar"><div class="brand"><span class="brand-mark">🍚</span><div><b>食堂雷达</b><small>' + D.school + '</small></div></div><a class="ghost-btn" href="#/about">这是啥</a></header>');
     h.push(guideHtml());
-    if (simOn()) h.push('<div class="simpill">🟢 演示模式：正在模拟其他同学的点评</div>');
-    h.push('<section class="hero"><div class="hero-icon">' + p.icon + '</div><div><h1>' + p.t + '，今天吃这个</h1><p>' + p.s + '</p></div></section>');
+    h.push(liveBanner());
+    var meal = C.mealOf(new Date());
+    var mealLabel = C.MEAL_LABEL[meal];
+    var tips = {
+      breakfast: "包子、粥、茶叶蛋优先——早上别点香锅",
+      lunch: "主食配个炒菜，队最短的先上",
+      dinner: "来点粥和饼，胃今天就到这了",
+      night: "夜宵摊还亮着，罪恶感先放一边"
+    };
+    h.push('<section class="hero compact"><div class="hero-icon">' + p.icon + '</div><div><h1>' + esc(mealLabel) + '时间 · 今天吃这个</h1><p>' + esc(tips[meal]) + '</p></div></section>');
 
     var chips = [["cheap", "💸 10 块内"], ["nowait", "🏃 不排队"], ["spicy", "🌶️ 想吃辣"], ["light", "🥬 清淡点"], ["protein", "💪 高蛋白"], ["fresh", "🆕 没吃过"]];
     h.push('<div class="chips hscroll">');
@@ -390,34 +420,37 @@
         '<div class="rec-main"><h3>' + esc(d.name) + (d.isNew ? ' <span class="tag-new">新</span>' : '') + '</h3>' +
         '<p class="rec-sub">' + d.canteen.name + ' · ' + d.win.name + ' · ' + money(d.price) + '</p></div>' +
         '<div class="rec-score"><b>' + d.avg.toFixed(1) + '</b><span>🌸</span></div></div>' +
-        '<div class="rec-meta"><span>🌸 ' + d.votes + ' 朵小红花</span><span>⏱ ' + d.wait + ' 分钟</span>' + riskChip(d) + '</div>' +
-        '<ul class="why">');
-      x.reasons.forEach(function (r) { h.push('<li>' + esc(r) + '</li>'); });
-      h.push('</ul><div class="rec-foot"><span class="why-label">为什么是它</span><span class="go">看有几个人吐槽 →</span></div></article>');
+        '<div class="rec-meta"><span>🌸 ' + d.votes + '</span><span>⏱ ' + d.wait + ' 分</span>' + riskChip(d) + '</div>' +
+        '<p class="why-line">' + x.reasons.slice(0, 2).map(function (r) { return esc(r); }).join(" · ") + '</p></article>');
     });
     h.push('</div>');
     h.push('<button class="shuffle" data-act="shuffle">🎲 再来一批，我还能纠结</button>');
 
-    // 搭配推荐：主食 + 蛋白 + 蔬菜
-    h.push('<div class="section-title"><span>搭配推荐 · 一个人也要好好吃饭</span><span class="sec-actions"><button class="sec-arrow" data-act="scroll" data-target=".combos" data-dir="-1" aria-label="上一组搭配">‹</button><button class="sec-arrow" data-act="scroll" data-target=".combos" data-dir="1" aria-label="下一组搭配">›</button><button class="sec-act" data-act="combo-rand">🎲 配一套</button></span></div>');
-    h.push('<div class="combos hscroll">');
-    combos().forEach(function (k) {
-      h.push('<article class="combo" data-act="combo" data-id="' + k.c.id + '"><div class="combo-head"><span class="combo-emoji">' + k.c.emoji + '</span><div><b>' + esc(k.c.name) + '</b><small>' + k.ds.length + ' 道 · ' + k.shape + '</small></div></div><div class="combo-dishes">');
-      k.ds.forEach(function (d) {
-        h.push('<button class="combo-dish" data-act="go" data-href="#/dish/' + d.id + '"><span>' + d.emoji + '</span><span>' + esc(d.name) + '</span><em>' + money(d.price) + '</em></button>');
+    // 搭配与上新合并成一个托盘，减少页面长度
+    h.push('<div class="tray">');
+    h.push('<div class="tray-head"><div class="tray-tabs">' +
+      '<button class="tray-tab' + (S.tray !== "new" ? " on" : "") + '" data-act="tray" data-key="combo">🍱 搭配</button>' +
+      '<button class="tray-tab' + (S.tray === "new" ? " on" : "") + '" data-act="tray" data-key="new">🆕 上新</button></div>' +
+      (S.tray === "new" ? '' : '<span class="sec-actions"><button class="sec-arrow" data-act="scroll" data-target=".combos" data-dir="-1" aria-label="上一组">‹</button><button class="sec-arrow" data-act="scroll" data-target=".combos" data-dir="1" aria-label="下一组">›</button><button class="sec-act" data-act="combo-rand">🎲 配一套</button></span>') +
+      '</div>');
+    if (S.tray === "new") {
+      h.push('<div class="hstrip hscroll">');
+      newOnes.forEach(function (d) {
+        h.push('<a class="mini" href="#/dish/' + d.id + '">' + foodTile(d, "sm") + '<b>' + esc(d.name) + '</b><span>' + money(d.price) + ' · 🌸' + d.avg.toFixed(1) + '</span><span class="mini-note">' + d.votes + ' 人试过</span></a>');
       });
-      h.push('</div><p class="combo-tagline">' + esc(k.c.tagline) + '</p><div class="combo-foot"><span class="combo-price">' + money(k.price) + '</span><span>' + k.kcal + ' kcal · 均分 ' + k.avg.toFixed(1) + ' 🌸</span></div></article>');
-    });
+      h.push('</div>');
+    } else {
+      h.push('<div class="combos hscroll">');
+      combos().forEach(function (k) {
+        h.push('<article class="combo" data-act="combo" data-id="' + k.c.id + '"><div class="combo-head"><span class="combo-emoji">' + k.c.emoji + '</span><div><b>' + esc(k.c.name) + '</b><small>' + k.ds.length + ' 道 · ' + k.shape + '</small></div></div><div class="combo-dishes">');
+        k.ds.forEach(function (d) {
+          h.push('<button class="combo-dish" data-act="go" data-href="#/dish/' + d.id + '"><span>' + d.emoji + '</span><span>' + esc(d.name) + '</span><em>' + money(d.price) + '</em></button>');
+        });
+        h.push('</div><p class="combo-tagline">' + esc(k.c.tagline) + '</p><div class="combo-foot"><span class="combo-price">' + money(k.price) + '</span><span>' + k.kcal + ' kcal</span></div></article>');
+      });
+      h.push('</div>');
+    }
     h.push('</div>');
-
-    h.push('<div class="section-title"><span>今日上新 · 试吃官已就位</span><small>新菜先让雷达的同学试毒</small></div>');
-    h.push('<div class="hstrip hscroll">');
-    newOnes.forEach(function (d) {
-      h.push('<a class="mini" href="#/dish/' + d.id + '">' + foodTile(d, "sm") + '<b>' + esc(d.name) + '</b><span>' + money(d.price) + ' · 🌸' + d.avg.toFixed(1) + '</span><span class="mini-note">' + d.votes + ' 人试过</span></a>');
-    });
-    h.push('</div>');
-
-    h.push(liveStrip());
     h.push('<div class="alert"><div class="alert-ico">⚡</div><div><b>踩雷预警：' + esc(danger.name) + '</b><p>雷率 ' + pct(danger.ray) + '，最近有人说「' + esc(flawOf(danger)) + '」。</p></div><a href="#/dish/' + danger.id + '">围观</a></div>');
     h.push('<div class="proof">👀 你宿舍楼今天有 <b>' + (3 + (S.order % 4)) + '</b> 个人吃了「' + esc(picks[0].d.name) + '」，目前没人喊退钱。</div>');
     return h.join('');
@@ -947,6 +980,12 @@
     if (act === "clear-filter") { S.filters = {}; savePrefs(); render(); toast("筛选清空了，重新挑一次"); return; }
     if (act === "recombo") { S.comboVariant = (S.comboVariant || 0) + 1; savePrefs(); render(true); return; }
     if (act === "pic") { openPic(dById[el.getAttribute("data-id")], +el.getAttribute("data-n")); return; }
+    if (act === "tray") { S.tray = el.getAttribute("data-key"); render(true); return; }
+    if (act === "live-jump") {
+      var lid = el.getAttribute("data-id");
+      if (lid) location.hash = "#/dish/" + lid;
+      return;
+    }
     if (act === "close-guide") {
       try { localStorage.setItem(GUIDE_KEY, "1"); } catch (e) {}
       render(true);
@@ -1086,5 +1125,6 @@
     });
   }
   setInterval(runSim, 12000);
+  setInterval(rotateLive, 4200);
   window.FDR_SIM = { run: runSim, on: simOn };
 })();

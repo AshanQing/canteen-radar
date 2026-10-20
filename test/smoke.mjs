@@ -24,7 +24,8 @@ const click = (el) => el.dispatchEvent(new window.MouseEvent("click", { bubbles:
 
 window.addEventListener("error", (e) => console.log("JS ERROR:", e.message, "|", (e.error && e.error.stack || "").split("\n")[1] || ""));
 console.log("1 首屏渲染:", q("#app .screen").length === 1, "| rec 卡片:", q(".rec").length, "| 导航:", q(".tab").length);
-console.log("1b 引导条:", q(".guide").length, "| 菜品图:", q(".foodimg").length, "| 演示提示:", q(".simpill").length);
+console.log("1b 引导条:", q(".guide").length, "| 菜品图:", q(".foodimg").length, "| 播报条:", q(".livebar").length, "| 时段文案:", q(".hero h1")[0].textContent);
+console.log("1d 托盘标签:", q(".tray-tab").length, "| 当前:", q(".tray-tab.on")[0].textContent, "| 组合卡:", q(".combo").length);
 click(q('[data-act="close-guide"]')[0]);
 await new Promise((r) => setTimeout(r, 40));
 console.log("1c 引导可关闭:", q(".guide").length === 0, "| 已记住:", window.localStorage.getItem("fdr_guide_v1"));
@@ -133,15 +134,16 @@ const simBefore = window.Store.reviews.length;
 window.FDR_SIM.run();
 window.FDR_SIM.run();
 console.log("12a 演示注入:", simBefore, "→", window.Store.reviews.length, "| 模拟作者:", window.Store.reviews.filter(r => /^sim-/.test(r.authorId)).length);
-console.log("12b 注入后仍可用:", q(".rec").length === 3, "| 首页实时条:", q(".livecard").length, "| hash:", JSON.stringify(window.location.hash));
+console.log("12b 注入后仍可用:", q(".rec").length === 3, "| 播报条:", q(".livebar").length, "| 文案:", (doc.querySelector("#lb-text") || {}).textContent);
 
 // 复现你遇到的场景：刚打开、地址栏没有 #/today
 window.location.hash = "";
 await new Promise((r) => setTimeout(r, 60));
-const stripBefore = q(".livecard").length;
+const txtBefore = (doc.querySelector("#lb-text") || {}).textContent;
 window.FDR_SIM.run();
 await new Promise((r) => setTimeout(r, 60));
-console.log("12c 空 hash 场景:", JSON.stringify(window.location.hash), "| 注入前:", stripBefore, "→ 注入后:", q(".livecard").length);
+const txtAfter = (doc.querySelector("#lb-text") || {}).textContent;
+console.log("12c 空 hash 场景:", JSON.stringify(window.location.hash), "| 播报更新:", txtBefore !== txtAfter, "|", txtAfter);
 console.log("12 运行错误:", errors.length ? errors.slice(0, 5) : "无");
 window.close();
 process.exit(0);

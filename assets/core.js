@@ -50,7 +50,7 @@
     return clamp((dist[0] + dist[1] * 0.8 + dist[2] * 0.15) / t, 0, 1);
   }
 
-  var BASE_W = { taste: 0.20, good: 0.20, fresh: 0.15, wait: 0.15, value: 0.12, walk: 0.08, risk: 0.10 };
+  var BASE_W = { meal: 0.16, taste: 0.17, good: 0.19, fresh: 0.13, wait: 0.13, value: 0.10, walk: 0.06, risk: 0.06 };
 
   function weightsFor(filters) {
     var w = Object.assign({}, BASE_W);
@@ -71,6 +71,7 @@
     var w = weightsFor(filters);
     var avg = ctx.avg;
     var parts = {
+      meal: mealScore(d, ctx.meal || "lunch"),
       taste: clamp(avg / 5, 0, 1),
       good: ctx.wilson,
       fresh: ctx.eaten ? 0.1 : (d.isNew ? 1 : 0.85),
@@ -86,6 +87,7 @@
 
   function reasonsFor(d, ctx, r) {
     var out = [];
+    if ((r.meal || 0) > 0.85 && ctx.mealLabel) out.push(ctx.mealLabel + "就该吃这个，不折腾");
     if (!ctx.eaten) out.push(d.isNew ? "全校还没几个人吃过，你是先锋" : "你还没吃过，雷达替你排了队");
     if (r.good > 0.82) out.push("老客好评 " + Math.round(ctx.goodRate * 100) + "%，不是刷的");
     if (d.wait <= 5) out.push("现在排队约 " + d.wait + " 分钟，够你吃完再冲教室");
@@ -101,6 +103,39 @@
     return ctx.wilson * Math.log(1 + ctx.votes) * (ctx.decay == null ? 1 : ctx.decay);
   }
 
+
+  /* ---------- 用餐时段 ---------- */
+  var MEAL_LABEL = { breakfast: "早餐", lunch: "午餐", dinner: "晚餐", night: "夜宵" };
+
+  function mealOf(date) {
+    var h = (date || new Date()).getHours();
+    if (h >= 5 && h < 10) return "breakfast";
+    if (h >= 10 && h < 15) return "lunch";
+    if (h >= 15 && h < 21) return "dinner";
+    return "night";
+  }
+
+  // 一道菜在各个时段的适配度（没归一化，只是相对权重）
+  function mealAffinity(d) {
+    var n = d.name, t = d.tags;
+    var s = { breakfast: 0, lunch: 0, dinner: 0, night: 0 };
+    if (/包子|粥|茶叶蛋|豆沙包|馒头|饼|蛋羹|油条|豆浆|卷/.test(n)) s.breakfast += 1;
+    if (t.indexOf("早餐") >= 0) s.breakfast += 1;
+    if (/盖饭|炒饭|炒面|香锅|拉面|拉条|黄焖|河粉|螺蛳粉|馒头/.test(n) || t.indexOf("面食") >= 0) s.lunch += 1;
+    if (t.indexOf("顶") >= 0 || t.indexOf("肉食") >= 0) s.lunch += 0.6;
+    if (/粥|饼|蒸|汤/.test(n) || t.indexOf("清淡") >= 0 || t.indexOf("蒸菜") >= 0) s.dinner += 1;
+    if (t.indexOf("轻食") >= 0) s.dinner += 0.5;
+    if (/烤|炒面|河粉|螺蛳粉|关东煮|炸/.test(n) || t.indexOf("夜宵") >= 0 || t.indexOf("烧烤") >= 0) s.night += 1;
+    // 早餐不该出现的重口：辣、臭、油炸
+    if (t.indexOf("辣") >= 0 || t.indexOf("臭味") >= 0) s.breakfast -= 0.8;
+    if (t.indexOf("炸物") >= 0) s.breakfast -= 0.5;
+    return s;
+  }
+
+  function mealScore(d, meal) {
+    var a = mealAffinity(d)[meal] || 0;
+    return clamp(0.45 + a * 0.55, 0, 1);
+  }
 
   /* ---------- 按主菜自动配菜 ---------- */
   function roleOf(d) {
@@ -177,6 +212,7 @@
   }
 
   globalThis.FDR_CORE = {
+    mealOf: mealOf, mealAffinity: mealAffinity, mealScore: mealScore, MEAL_LABEL: MEAL_LABEL,
     roleOf: roleOf, buildCombo: buildCombo,
     clamp: clamp, buildDist: buildDist, avgOfDist: avgOfDist, wilson: wilson,
     riskOf: riskOf, scoreDish: scoreDish, reasonsFor: reasonsFor, rankScore: rankScore,
