@@ -519,6 +519,25 @@ textarea:focus{border-color:var(--brand)}
 .tray .combos{padding-bottom:10px}
 .tray .combo{flex:0 0 240px}
 .tray .hstrip{padding-bottom:12px}
+/* ---------- 播报回溯 ---------- */
+.lb-count{font-size:10px;font-weight:700;background:var(--danger-bg);color:var(--danger);
+  border-radius:999px;padding:2px 7px;flex:0 0 auto}
+.live-sheet{max-height:84vh}
+.live-list{display:flex;flex-direction:column;margin-top:6px;max-height:54vh;overflow-y:auto}
+.lrow{display:flex;gap:10px;align-items:flex-start;padding:11px 6px;width:100%;text-align:left;
+  border-bottom:1px solid var(--line);background:none;border-radius:10px}
+.lrow:last-child{border-bottom:0}
+.lrow.unread{background:var(--chip)}
+.lrow-ava{width:30px;height:30px;border-radius:50%;background:var(--surface);
+  display:grid;place-items:center;font-size:15px;flex:0 0 30px;border:1px solid var(--line)}
+.lrow-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.lrow-top{display:flex;align-items:center;gap:6px}
+.lrow-top b{font-size:12.5px;font-weight:600;color:var(--ink)}
+.lrow-new{font-size:9px;background:var(--danger);color:#fff;border-radius:4px;padding:1px 4px;line-height:1.3}
+.lrow-flower{margin-left:auto;font-size:10px;letter-spacing:-1px}
+.lrow-text{font-size:12px;color:var(--ink-2);line-height:1.5}
+.lrow-foot{font-size:10.5px;color:var(--muted)}
+
 
 
 

@@ -344,6 +344,24 @@
   }
 
   var lastLiveLen = -1, liveIdx = 0;
+  var SEEN_KEY = "fdr_live_seen_v1";
+
+  function seenId() {
+    try { return localStorage.getItem(SEEN_KEY) || ""; } catch (e) { return ""; }
+  }
+  function markSeen(id) {
+    try { localStorage.setItem(SEEN_KEY, id); } catch (e) {}
+  }
+  function recentReviews(n) {
+    return window.Store.reviews.slice().reverse().slice(0, n || 10);
+  }
+  // 未读条数：从最新往前数，直到遇到上次看过的 id
+  function unseenCount() {
+    var list = recentReviews(30), seen = seenId();
+    if (!seen) return Math.min(list.length, 9);
+    for (var i = 0; i < list.length; i++) if (list[i].id === seen) return i;
+    return Math.min(list.length, 9);
+  }
 
   function liveText(r) {
     var d = dById[r.dishId];
@@ -357,10 +375,12 @@
     if (!list.length) {
       return '<div class="livebar idle" id="livebar"><span class="lb-badge">📢</span><span class="lb-text">还没有实时点评，等第一条…</span></div>';
     }
-    var r = list[liveIdx % list.length], d = dById[r.dishId];
-    return '<button class="livebar' + (fresh ? " fresh" : "") + '" id="livebar" data-act="live-jump" data-id="' + (d ? d.id : "") + '">' +
+    var r = list[liveIdx % list.length];
+    var un = unseenCount();
+    return '<button class="livebar' + (fresh ? " fresh" : "") + '" id="livebar" data-act="live-list">' +
       '<span class="lb-badge">📢</span><span class="lb-text" id="lb-text">' + esc(liveText(r)) + '</span>' +
-      '<span class="lb-go">去看看 ›</span></button>';
+      (un > 0 ? '<span class="lb-count">' + un + ' 条新</span>' : '') +
+      '<span class="lb-go">全部 ›</span></button>';
   }
 
   function rotateLive() {
@@ -819,6 +839,32 @@
     document.body.classList.add("lock");
   }
 
+  function openLiveList() {
+    var list = recentReviews(10);
+    var seen = seenId();
+    var cut = list.length;
+    for (var i = 0; i < list.length; i++) if (list[i].id === seen) { cut = i; break; }
+    var h = ['<div class="sheet-mask" data-act="close-sheet"></div><div class="sheet live-sheet">',
+      '<div class="sheet-head"><b>实时播报 · 最近 ' + list.length + ' 条</b><span class="sheet-close" data-act="close-sheet">✕</span></div>',
+      '<p class="sheet-sub">' + (unseenCount() > 0 ? "有 " + unseenCount() + " 条是新的，打开这一页就算已读" : "都看过了，等新的来了会出现角标") + '</p>',
+      '<div class="live-list">'];
+    if (!list.length) h.push('<p class="hint">还没有实时点评，等第一条。</p>');
+    list.forEach(function (r, idx) {
+      var d = dById[r.dishId];
+      h.push('<button class="lrow' + (idx < cut ? " unread" : "") + '" data-act="live-go" data-href="#/dish/' + r.dishId + '">' +
+        '<span class="lrow-ava">' + (r.avatar || "🐱") + '</span>' +
+        '<span class="lrow-main"><span class="lrow-top"><b>' + esc(r.authorName) + '</b>' +
+        (idx < cut ? '<span class="lrow-new">新</span>' : '') +
+        '<span class="lrow-flower">' + flowers(r.flowers) + '</span></span>' +
+        '<span class="lrow-text">' + esc((r.text || "").slice(0, 46)) + '</span>' +
+        '<span class="lrow-foot">' + (d ? esc(d.name) : "已下架") + ' · ' + relTime(r.createdAt) + '</span></span></button>');
+    });
+    h.push('</div><p class="sheet-note">演示模式会一直冒新的，关掉面板也不会丢，下次还能从这里翻。</p></div>');
+    document.getElementById("sheet-root").innerHTML = h.join("");
+    document.body.classList.add("lock");
+    if (list.length) markSeen(list[0].id);
+  }
+
   function openCodeSheet(mode) {
     var isExport = mode === "export";
     var val = isExport ? window.Store.exportShare() : "";
@@ -981,9 +1027,11 @@
     if (act === "recombo") { S.comboVariant = (S.comboVariant || 0) + 1; savePrefs(); render(true); return; }
     if (act === "pic") { openPic(dById[el.getAttribute("data-id")], +el.getAttribute("data-n")); return; }
     if (act === "tray") { S.tray = el.getAttribute("data-key"); render(true); return; }
-    if (act === "live-jump") {
-      var lid = el.getAttribute("data-id");
-      if (lid) location.hash = "#/dish/" + lid;
+    if (act === "live-list") { openLiveList(); return; }
+    if (act === "live-go") {
+      var href = el.getAttribute("data-href");
+      closeSheet();
+      if (href) location.hash = href;
       return;
     }
     if (act === "close-guide") {

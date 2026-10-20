@@ -144,6 +144,20 @@ window.FDR_SIM.run();
 await new Promise((r) => setTimeout(r, 60));
 const txtAfter = (doc.querySelector("#lb-text") || {}).textContent;
 console.log("12c 空 hash 场景:", JSON.stringify(window.location.hash), "| 播报更新:", txtBefore !== txtAfter, "|", txtAfter);
+// 播报回溯
+window.location.hash = "#/today";
+await new Promise((r) => setTimeout(r, 60));
+console.log("12d 播报角标:", q(".lb-count").length, "|", q(".lb-count")[0] && q(".lb-count")[0].textContent);
+click(q(".livebar")[0]);
+await new Promise((r) => setTimeout(r, 40));
+console.log("12e 回溯面板:", !!doc.querySelector(".live-sheet"), "| 条数:", q(".lrow").length, "| 新标:", q(".lrow-new").length);
+click(q(".lrow")[0]);
+await new Promise((r) => setTimeout(r, 60));
+console.log("12f 点条目跳转:", window.location.hash, "| 面板已关:", !doc.querySelector(".live-sheet"));
+window.location.hash = "#/today";
+await new Promise((r) => setTimeout(r, 60));
+console.log("12g 已读后角标:", q(".lb-count").length === 0, "| 再看面板新标:", (click(q(".livebar")[0]), await new Promise(r => setTimeout(r, 40)), q(".lrow-new").length));
+
 console.log("12 运行错误:", errors.length ? errors.slice(0, 5) : "无");
 window.close();
 process.exit(0);
